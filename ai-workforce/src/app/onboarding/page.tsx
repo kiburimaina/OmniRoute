@@ -14,21 +14,28 @@ export default function OnboardingPage() {
     event.preventDefault();
     setBusy(true);
     setError("");
-    const session = await authClient.getSession();
-    if (!session.data?.user) {
+    try {
+      const session = await authClient.getSession();
+      if (!session.data?.user) {
+        router.replace("/sign-in");
+        return;
+      }
+      const response = await fetch("/api/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || "Could not create your workspace.");
+        return;
+      }
+      router.replace("/");
+    } catch {
+      setError("We could not reach the service. Please try again.");
+    } finally {
       setBusy(false);
-      router.replace("/sign-in");
-      return;
     }
-    const response = await fetch("/api/organizations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    const data = await response.json();
-    setBusy(false);
-    if (!response.ok) setError(data.error || "Could not create your workspace.");
-    else router.replace("/");
   }
 
   return (
