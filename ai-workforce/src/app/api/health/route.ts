@@ -10,6 +10,7 @@ export async function GET() {
     process.env.APP_ORIGIN,
   );
   const databaseReady = Boolean(process.env.DATABASE_URL);
+  const workerAuthReady = Boolean(process.env.WORKER_SHARED_SECRET && new TextEncoder().encode(process.env.WORKER_SHARED_SECRET).byteLength >= 32);
 
   return Response.json({
     status: "ok",
@@ -18,6 +19,7 @@ export async function GET() {
     readiness: {
       businessDatabaseConfigured: databaseReady,
       authenticationConfigured: authReady,
+      internalWorkerAuthenticationConfigured: workerAuthReady,
       modelProvidersEnabled: false,
       outboundActionsEnabled: false,
     },
