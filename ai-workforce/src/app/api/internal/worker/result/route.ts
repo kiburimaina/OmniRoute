@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { apiError, readJson, withWorkerTransaction } from "@/lib/db";
 import { completeTask, failTask } from "@/lib/task-queue";
+import { prepareTaskExecution } from "@/lib/agent-runtime";
+import { InvalidWorkflowOutput, validateTaskOutput } from "@/lib/workflow-output";
 import { requireWorkerAuthentication, requireWorkerOrganizationAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
@@ -34,7 +36,14 @@ export async function POST(request: Request) {
     requireWorkerOrganizationAccess(input.organizationId);
     const result = await withWorkerTransaction(input.organizationId, async (client) => {
       if (input.outcome === "succeeded") {
-        const completed = await completeTask(client, input.organizationId, input.taskId, input.workerId, input.output);
+        const execution = await prepareTaskExecution(client, input.organizationId, input.taskId, input.workerId);
+        let validatedOutput;
+        try { validatedOutput = validateTaskOutput(execution, input.output); }
+        catch (error) {
+          if (error instanceof InvalidWorkflowOutput) return { accepted: false as const, invalidOutput: true as const, message: error.message };
+          throw error;
+        }
+        const completed = await completeTask(client, input.organizationId, input.taskId, input.workerId, validatedOutput);
         if (!completed) return { accepted: false as const };
         await client.query(
           "INSERT INTO audit_events (organization_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, 'agent', 'worker.task_succeeded', 'task', $2, $3::jsonb)",
@@ -50,6 +59,7 @@ export async function POST(request: Request) {
       );
       return { accepted: true as const, status };
     });
+    if (!result.accepted && "invalidOutput" in result && result.invalidOutput) return Response.json({ error: result.message }, { status: 422 });
     if (!result.accepted) return Response.json({ error: "Task lease is not owned by this worker" }, { status: 409 });
     return Response.json(result);
   } catch (error) {
