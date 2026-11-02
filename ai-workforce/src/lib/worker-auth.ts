@@ -16,3 +16,10 @@ export function requireWorkerAuthentication(request: Request): void {
     throw new HttpError(401, "Worker authentication failed");
   }
 }
+
+export function requireWorkerOrganizationAccess(organizationId: string): void {
+  const configured = process.env.WORKER_ALLOWED_ORGANIZATIONS;
+  if (!configured) throw new HttpError(503, "Worker organization allowlist is not configured");
+  const allowed = new Set(configured.split(",").map((value) => value.trim()).filter(Boolean));
+  if (!allowed.has(organizationId)) throw new HttpError(403, "Worker is not authorized for this organization");
+}
