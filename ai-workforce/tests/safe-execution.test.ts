@@ -55,6 +55,6 @@ describe("safe prepared task runner", () => {
   it("rejects malformed executor output", async () => {
     const registry = new ExecutorRegistry();
     registry.register({ id: "test-runner", supports: () => true, execute: async () => ({ summary: "", data: {} }) });
-    await expect(runPreparedTask(execution, registry, new AbortController().signal)).rejects.toThrow("invalid task output");
+    await expect(runPreparedTask(execution, registry, new AbortController().signal)).rejects.toThrow("Task output must contain");
   });
 });
