@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     }
     const tasks = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client) => {
       const result = await client.query(
-        "SELECT id, organization_id AS \"organizationId\", project_id AS \"projectId\", title, description, status, created_at AS \"createdAt\" FROM tasks WHERE organization_id = $1 ORDER BY created_at DESC LIMIT 100",
+        "SELECT t.id, t.organization_id AS \"organizationId\", t.project_id AS \"projectId\", t.assigned_agent_id AS \"assignedAgentId\", a.name AS \"agentName\", t.title, t.description, t.status, t.created_at AS \"createdAt\" FROM tasks t LEFT JOIN agents a ON a.organization_id = t.organization_id AND a.id = t.assigned_agent_id WHERE t.organization_id = $1 ORDER BY t.created_at DESC LIMIT 100",
         [organizationId],
       );
       return result.rows;
