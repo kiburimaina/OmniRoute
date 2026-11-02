@@ -10,7 +10,7 @@ export async function GET() {
     process.env.APP_ORIGIN,
   );
   const databaseReady = Boolean(process.env.DATABASE_URL);
-  const workerAuthReady = Boolean(process.env.WORKER_SHARED_SECRET && new TextEncoder().encode(process.env.WORKER_SHARED_SECRET).byteLength >= 32);
+  const workerAuthReady = Boolean(process.env.WORKER_SHARED_SECRET && new TextEncoder().encode(process.env.WORKER_SHARED_SECRET).byteLength >= 32 && process.env.WORKER_ALLOWED_ORGANIZATIONS?.split(",").some((id) => /^[0-9a-f-]{36}$/i.test(id.trim())));
 
   return Response.json({
     status: "ok",
