@@ -18,8 +18,6 @@ function safeErrorMessage(value: string): string {
 
 const WORKER_ID = /^[a-zA-Z0-9._:-]{1,120}$/;
 
-// Call only inside a transaction using a dedicated worker identity.
-// RLS remains active and is scoped to the supplied organization.
 export async function claimNextTask(
   client: PoolClient,
   organizationId: string,
@@ -28,14 +26,19 @@ export async function claimNextTask(
 ): Promise<LeasedTask | null> {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
   if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
-  if (!Number.isInteger(maxConcurrentTasks) || maxConcurrentTasks < 1 || maxConcurrentTasks > 10) throw new Error("Invalid worker concurrency limit");
+  if (!Number.isInteger(maxConcurrentTasks) || maxConcurrentTasks < 1 || maxConcurrentTasks > 10) {
+    throw new Error("Invalid worker concurrency limit");
+  }
+
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [organizationId + ":" + workerId]);
+
   const active = await client.query<{ count: string }>(
     "SELECT count(*)::text AS count FROM tasks WHERE organization_id = $1 AND status = 'running' AND locked_by = $2",
     [organizationId, workerId],
   );
   if (Number(active.rows[0]?.count ?? 0) >= maxConcurrentTasks) return null;
+
   const result = await client.query<LeasedTask>(
     `WITH candidate AS (
        SELECT id FROM tasks
@@ -45,13 +48,16 @@ export async function claimNextTask(
      )
      UPDATE tasks AS task
      SET status = 'running', locked_at = now(), locked_by = $2,
-         attempt_count = task.attempt_count + 1, started_at = COALESCE(task.started_at, now()), completed_at = NULL, result = NULL, updated_at = now()
+         attempt_count = task.attempt_count + 1,
+         started_at = COALESCE(task.started_at, now()),
+         completed_at = NULL, result = NULL, updated_at = now()
      FROM candidate
      WHERE task.id = candidate.id
      RETURNING task.id, task.organization_id AS "organizationId", task.title,
        task.description, task.attempt_count AS "attemptCount", task.max_attempts AS "maxAttempts"`,
     [organizationId, workerId],
   );
+
   const claimed = result.rows[0];
   if (claimed) {
     await client.query(
@@ -70,15 +76,21 @@ export async function completeTask(
   output: TaskOutput = { summary: "Task completed", data: {} },
 ): Promise<boolean> {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
-  if (!output || typeof output.summary !== "string" || output.summary.length > 2000 || !output.data || typeof output.data !== "object" || Array.isArray(output.data)) throw new Error("Invalid structured task output");
+  if (!output || typeof output.summary !== "string" || output.summary.length > 2000 ||
+      !output.data || typeof output.data !== "object" || Array.isArray(output.data)) {
+    throw new Error("Invalid structured task output");
+  }
+
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const result = await client.query(
-    `UPDATE tasks AS task SET status = 'succeeded', locked_at = NULL, locked_by = NULL,
-       result = $4::jsonb, last_error = NULL, completed_at = now(), updated_at = now()
+    `UPDATE tasks AS task
+     SET status = 'succeeded', locked_at = NULL, locked_by = NULL,
+         result = $4::jsonb, last_error = NULL, completed_at = now(), updated_at = now()
      WHERE task.organization_id = $1 AND task.id = $2
        AND task.status = 'running' AND task.locked_by = $3
        AND EXISTS (
-         SELECT 1 FROM task_execution_attempts AS attempt
+         SELECT 1
+         FROM task_execution_attempts AS attempt
          JOIN agents AS agent
            ON agent.organization_id = attempt.organization_id
           AND agent.id = task.assigned_agent_id
@@ -87,105 +99,18 @@ export async function completeTask(
            AND attempt.worker_id = $3
            AND attempt.status = 'running'
            AND attempt.started_at > now() - make_interval(secs =>
-             CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3},
-    [organizationId, taskId, workerId, JSON.stringify(output)],
-  );
-  if (result.rowCount === 1) {
-    await client.query("UPDATE task_execution_attempts SET status = 'succeeded', output = $4::jsonb, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'", [organizationId, taskId, workerId, JSON.stringify(output)]);
-  }
-  return result.rowCount === 1;
-}
-
-export async function failTask(
-  client: PoolClient,
-  organizationId: string,
-  taskId: string,
-  workerId: string,
-  errorMessage: string,
-): Promise<"queued" | "failed" | "not_owned"> {
-  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
-  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
-  const safeMessage = safeErrorMessage(errorMessage);
-  const result = await client.query<{ status: "queued" | "failed" }>(
-    `UPDATE tasks
-     SET status = CASE WHEN attempt_count < max_attempts THEN 'queued' ELSE 'failed' END,
-         available_at = CASE WHEN attempt_count < max_attempts
-           THEN now() + make_interval(secs => LEAST(300, power(2, GREATEST(0, attempt_count - 1))::int))
-           ELSE available_at END,
-         locked_at = NULL, locked_by = NULL, last_error = $4, updated_at = now()
-     WHERE organization_id = $1 AND id = $2 AND status = 'running' AND locked_by = $3
-     RETURNING status`,
-    [organizationId, taskId, workerId, safeMessage],
-  );
-  if (result.rows[0]) {
-    await client.query("UPDATE task_execution_attempts SET status = 'failed', error_message = $4, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'", [organizationId, taskId, workerId, safeMessage]);
-  }
-  if (result.rows[0]?.status === "failed") await client.query("UPDATE tasks SET completed_at = now() WHERE organization_id = $1 AND id = $2", [organizationId, taskId]);
-  return result.rows[0]?.status ?? "not_owned";
-}
-
-export async function recoverExpiredLeases(
-  client: PoolClient,
-  organizationId: string,
-  leaseSeconds = 300,
-): Promise<number> {
-  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
-  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
-  const seconds = Math.max(30, Math.min(3600, Math.trunc(leaseSeconds)));
-  const result = await client.query(
-    `UPDATE tasks SET
-       status = CASE WHEN attempt_count < max_attempts THEN 'queued' ELSE 'failed' END,
-       available_at = now(), locked_at = NULL, locked_by = NULL,
-       last_error = COALESCE(last_error, 'Worker lease expired'),
-       completed_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,
-       updated_at = now()
-     WHERE organization_id = $1 AND status = 'running'
-       AND locked_at < now() - make_interval(secs => $2)
-     RETURNING id, attempt_count`,
-    [organizationId, seconds],
-  );
-  for (const expired of result.rows as Array<{ id: string; attempt_count: number }>) {
-    await client.query("UPDATE task_execution_attempts SET status = 'lease_expired', error_message = 'Worker lease expired', finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND attempt_number = $3 AND status = 'running'", [organizationId, expired.id, expired.attempt_count]);
-  }
-  return result.rowCount ?? 0;
-}
-
-export async function heartbeatTask(
-  client: PoolClient,
-  organizationId: string,
-  taskId: string,
-  workerId: string,
-): Promise<boolean> {
-  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
-  if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
-  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
-  const result = await client.query(
-    `UPDATE tasks AS task SET locked_at = now(), updated_at = now()
-     FROM task_execution_attempts AS attempt
-     JOIN agents AS agent
-       ON agent.organization_id = attempt.organization_id
-      AND agent.id = (SELECT assigned_agent_id FROM tasks WHERE organization_id = $1 AND id = $2)
-     WHERE task.organization_id = $1 AND task.id = $2
-       AND task.status = 'running' AND task.locked_by = $3
-       AND attempt.organization_id = task.organization_id
-       AND attempt.task_id = task.id AND attempt.worker_id = $3
-       AND attempt.status = 'running'
-       AND attempt.started_at > now() - make_interval(secs =>
-         CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3}$'
-           THEN LEAST(300, GREATEST(5, (agent.policy->>'maxRuntimeSeconds')::int))
-           ELSE 60 END)`,
-    [organizationId, taskId, workerId],
-  );
-  return result.rowCount === 1;
-}
-
+             CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3}$'
                THEN LEAST(300, GREATEST(5, (agent.policy->>'maxRuntimeSeconds')::int))
                ELSE 60 END)
        )`,
     [organizationId, taskId, workerId, JSON.stringify(output)],
   );
+
   if (result.rowCount === 1) {
-    await client.query("UPDATE task_execution_attempts SET status = 'succeeded', output = $4::jsonb, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'", [organizationId, taskId, workerId, JSON.stringify(output)]);
+    await client.query(
+      "UPDATE task_execution_attempts SET status = 'succeeded', output = $4::jsonb, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'",
+      [organizationId, taskId, workerId, JSON.stringify(output)],
+    );
   }
   return result.rowCount === 1;
 }
@@ -211,10 +136,16 @@ export async function failTask(
      RETURNING status`,
     [organizationId, taskId, workerId, safeMessage],
   );
+
   if (result.rows[0]) {
-    await client.query("UPDATE task_execution_attempts SET status = 'failed', error_message = $4, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'", [organizationId, taskId, workerId, safeMessage]);
+    await client.query(
+      "UPDATE task_execution_attempts SET status = 'failed', error_message = $4, finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND worker_id = $3 AND status = 'running'",
+      [organizationId, taskId, workerId, safeMessage],
+    );
   }
-  if (result.rows[0]?.status === "failed") await client.query("UPDATE tasks SET completed_at = now() WHERE organization_id = $1 AND id = $2", [organizationId, taskId]);
+  if (result.rows[0]?.status === "failed") {
+    await client.query("UPDATE tasks SET completed_at = now() WHERE organization_id = $1 AND id = $2", [organizationId, taskId]);
+  }
   return result.rows[0]?.status ?? "not_owned";
 }
 
@@ -238,8 +169,12 @@ export async function recoverExpiredLeases(
      RETURNING id, attempt_count`,
     [organizationId, seconds],
   );
+
   for (const expired of result.rows as Array<{ id: string; attempt_count: number }>) {
-    await client.query("UPDATE task_execution_attempts SET status = 'lease_expired', error_message = 'Worker lease expired', finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND attempt_number = $3 AND status = 'running'", [organizationId, expired.id, expired.attempt_count]);
+    await client.query(
+      "UPDATE task_execution_attempts SET status = 'lease_expired', error_message = 'Worker lease expired', finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND attempt_number = $3 AND status = 'running'",
+      [organizationId, expired.id, expired.attempt_count],
+    );
   }
   return result.rowCount ?? 0;
 }
