@@ -6,7 +6,7 @@ let pool: Pool | undefined;
 
 function getPool(): Pool {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new HttpError(503, "Database is not configured");
   }
   pool ??= new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -23,6 +23,19 @@ export type OrganizationRole = "owner" | "admin" | "operator" | "viewer";
 export class HttpError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
+  }
+}
+
+/** Parse JSON consistently so malformed bodies are client errors, not 500s. */
+export async function readJson(request: Request): Promise<unknown> {
+  const contentType = request.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+  if (contentType !== "application/json") {
+    throw new HttpError(415, "Content-Type must be application/json");
+  }
+  try {
+    return await request.json();
+  } catch {
+    throw new HttpError(400, "Request body must contain valid JSON");
   }
 }
 
@@ -61,9 +74,6 @@ export async function withOrganization<T>(
 export function apiError(error: unknown): Response {
   if (error instanceof HttpError) {
     return Response.json({ error: error.message }, { status: error.status });
-  }
-  if (error instanceof Error && error.message === "DATABASE_URL is not configured") {
-    return Response.json({ error: "Database is not configured" }, { status: 503 });
   }
   return Response.json({ error: "Internal server error" }, { status: 500 });
 }
