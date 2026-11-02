@@ -67,7 +67,7 @@ describe("tenant-scoped task queue", () => {
   });
 
   it("bounds lease recovery duration and scopes it to the organization", async () => {
-    const { client, query } = clientWith([{ rowCount: 2 }]);
+    const { client, query } = clientWith([{}, { rowCount: 2 }]);
     await expect(recoverExpiredLeases(client, org, 99999)).resolves.toBe(2);
     expect(query.mock.calls[0][0]).toContain("set_config('app.current_org_id'");
     expect(query.mock.calls[1][1]).toEqual([org, 3600]);
