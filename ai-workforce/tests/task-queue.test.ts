@@ -3,7 +3,7 @@ import type { PoolClient } from "pg";
 import { claimNextTask, completeTask, failTask, recoverExpiredLeases } from "../src/lib/task-queue";
 
 function clientWith(results: Array<{ rows?: unknown[]; rowCount?: number }>) {
-  const query = vi.fn(async () => {
+  const query = vi.fn(async (..._args: unknown[]) => {
     const next = results.shift() ?? {};
     return { rows: next.rows ?? [], rowCount: next.rowCount ?? 0 };
   });
