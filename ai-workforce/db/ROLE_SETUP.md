@@ -17,9 +17,11 @@ GRANT USAGE ON SCHEMA public TO aw_app;
 GRANT SELECT, INSERT ON TABLE organizations TO aw_app;
 GRANT SELECT, INSERT ON TABLE organization_members TO aw_app;
 
--- Current API surface only: project/task listing and creation plus audit inserts.
+-- Current API surface: projects, tasks, agent registry, approvals, and audit events.
 GRANT SELECT, INSERT ON TABLE projects TO aw_app;
 GRANT SELECT, INSERT ON TABLE tasks TO aw_app;
+GRANT SELECT, INSERT ON TABLE agents TO aw_app;
+GRANT SELECT, INSERT, UPDATE ON TABLE approvals TO aw_app;
 GRANT INSERT ON TABLE audit_events TO aw_app;
 ```
 
