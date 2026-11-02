@@ -67,7 +67,7 @@ jobs:
           GRANT SELECT, INSERT ON TABLE organization_members TO aw_app;
           GRANT SELECT, INSERT ON TABLE projects TO aw_app;
           GRANT SELECT, INSERT, UPDATE ON TABLE tasks, agents, approvals TO aw_app;
-          GRANT SELECT, INSERT, UPDATE ON TABLE task_execution_attempts TO aw_app;
+          GRANT SELECT, INSERT, UPDATE ON TABLE task_execution_attempts TO aw_app;\n          GRANT SELECT, INSERT, UPDATE ON TABLE organization_spend_budgets, spend_reservations TO aw_app;
           GRANT INSERT ON TABLE audit_events TO aw_app;
           GRANT USAGE, SELECT ON SEQUENCE audit_events_id_seq TO aw_app;
           SQL
