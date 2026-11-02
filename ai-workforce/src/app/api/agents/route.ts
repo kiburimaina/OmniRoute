@@ -54,8 +54,8 @@ export async function POST(request: Request) {
     };
     const agent = await withOrganization(input.organizationId, ["owner", "admin"], async (client, userId) => {
       const result = await client.query(
-        "INSERT INTO agents (organization_id, name, department, enabled, policy) VALUES ($1, $2, $3, false, $4::jsonb) RETURNING id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\"",
-        [input.organizationId, agentName, department, JSON.stringify(policy)],
+        "INSERT INTO agents (organization_id, name, department, enabled, policy, template_id, description, responsibilities) VALUES ($1, $2, $3, false, $4::jsonb, $5, $6, $7::jsonb) RETURNING id, organization_id AS \"organizationId\", name, department, enabled, template_id AS \"templateId\", description, responsibilities, created_at AS \"createdAt\"",
+        [input.organizationId, agentName, department, JSON.stringify(policy), template?.id ?? null, template?.description ?? "", JSON.stringify(template?.responsibilities ?? [])],
       );
       const created = result.rows[0];
       await client.query(
