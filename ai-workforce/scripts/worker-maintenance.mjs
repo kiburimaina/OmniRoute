@@ -4,8 +4,6 @@ import { setTimeout as delay } from "node:timers/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 export function loadConfig(env = process.env) {
   const rawUrl = env.AI_WORKFORCE_API_URL;
   const secret = env.WORKER_SHARED_SECRET;
@@ -87,7 +85,9 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
         shutdown.signal.removeEventListener("abort", abort);
         inFlight = undefined;
       }
-      if (!stopping && !shutdown.signal.aborted) {\n        await delay(config.recoveryIntervalMs, undefined, { signal: shutdown.signal }).catch(() => {});\n      }
+      if (!stopping && !signal?.aborted && !shutdown.signal.aborted) {
+        await delay(config.recoveryIntervalMs, undefined, { signal: shutdown.signal }).catch(() => {});
+      }
     }
   } finally {
     if (inFlight) await inFlight.catch(() => {});
