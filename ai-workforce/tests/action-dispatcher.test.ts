@@ -32,6 +32,6 @@ describe("controlled action dispatcher", () => {
         reservation: null,
       },
       details: { sku: "sku-1" },
-    })).rejects.toThrow("live authorization token");
+    })).rejects.toThrow("Direct execution is disabled");
   });
 });
