@@ -96,12 +96,16 @@ export async function settleSpend(
 ): Promise<void> {
   if (!Number.isSafeInteger(actualMicros) || actualMicros < 0) throw new AuthorizationError("Actual spend must be a non-negative safe integer in micros");
   const reservation = await client.query<{ amount_micros: string }>(
-    "UPDATE spend_reservations SET status = 'settled', settled_at = now() WHERE organization_id = $1 AND id = $2 AND status = 'reserved' RETURNING amount_micros::text",
+    "SELECT amount_micros::text FROM spend_reservations WHERE organization_id = $1 AND id = $2 AND status = 'reserved' FOR UPDATE",
     [organizationId, reservationId],
   );
   if (!reservation.rowCount) throw new AuthorizationError("Spend reservation is missing or already finalised");
   const reserved = Number(reservation.rows[0].amount_micros);
   if (actualMicros > reserved) throw new AuthorizationError("Actual spend exceeds the approved reservation");
+  await client.query(
+    "UPDATE spend_reservations SET status = 'settled', settled_at = now() WHERE organization_id = $1 AND id = $2 AND status = 'reserved'",
+    [organizationId, reservationId],
+  );
   await client.query(
     "UPDATE organization_spend_budgets SET reserved_micros = reserved_micros - $2, spent_micros = spent_micros + $3, updated_at = now() WHERE organization_id = $1",
     [organizationId, reserved, actualMicros],
