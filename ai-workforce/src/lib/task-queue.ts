@@ -84,6 +84,8 @@ export async function recoverExpiredLeases(
   organizationId: string,
   leaseSeconds = 300,
 ): Promise<number> {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
+  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const seconds = Math.max(30, Math.min(3600, Math.trunc(leaseSeconds)));
   const result = await client.query(
     `UPDATE tasks SET
