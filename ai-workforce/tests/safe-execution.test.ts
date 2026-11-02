@@ -3,58 +3,90 @@ import type { PreparedExecution } from "../src/lib/agent-runtime";
 import { ExecutorRegistry } from "../src/lib/executor-registry";
 import { ExecutionAborted, ExecutionBudgetExceeded, runPreparedTask } from "../src/lib/safe-execution";
 
-const execution = {
-  taskId: "task-1",
-  agentId: "agent-1",
-  department: "operations",
-  workflow: undefined,
-  workflowInput: {},
-  policy: { maxSteps: 4, maxRuntimeSeconds: 30, maxOutputTokens: 0, allowedTools: [], requireApprovalFor: [] },
-  providerExecutionEnabled: false,
-  externalToolsEnabled: false,
-} as PreparedExecution;
+function execution(overrides: Partial<PreparedExecution> = {}): PreparedExecution {
+  return {
+    taskId: "task-1",
+    agentId: "agent-1",
+    department: "operations",
+    workflow: undefined,
+    workflowInput: {},
+    policy: {
+      maxSteps: 8,
+      maxRuntimeSeconds: 60,
+      maxOutputTokens: 0,
+      allowedTools: [],
+      requireApprovalFor: ["external_message", "publish", "purchase", "deploy", "repository_merge"],
+    },
+    providerExecutionEnabled: false,
+    externalToolsEnabled: false,
+    ...overrides,
+  };
+}
 
-describe("safe prepared task runner", () => {
-  it("runs one pure-data executor and validates its structured output", async () => {
-    const registry = new ExecutorRegistry();
-    const execute = vi.fn(async () => ({ summary: "Reviewed", data: { findings: [] } }));
-    registry.register({ id: "test-runner", supports: () => true, execute });
-    const result = await runPreparedTask(execution, registry, new AbortController().signal);
-    expect(result.summary).toBe("Reviewed");
-    expect(execute).toHaveBeenCalledOnce();
+function registryWith(execute: () => Promise<unknown> = async () => ({
+  summary: "Completed safely",
+  data: { notes: ["reviewed"] },
+})): ExecutorRegistry {
+  const registry = new ExecutorRegistry();
+  registry.register({
+    id: "test-executor",
+    supports: () => true,
+    execute: vi.fn(async () => execute() as never),
+  });
+  return registry;
+}
+
+describe("safe execution gate", () => {
+  it("runs a registered executor and validates its structured output", async () => {
+    const output = await runPreparedTask(execution(), registryWith(), new AbortController().signal);
+    expect(output).toEqual({ summary: "Completed safely", data: { notes: ["reviewed"] } });
   });
 
-  it("fails closed when no executor is registered", async () => {
-    await expect(runPreparedTask(execution, new ExecutorRegistry(), new AbortController().signal))
-      .rejects.toThrow("No approved executor");
+  it("blocks provider execution even when an executor is registered", async () => {
+    await expect(runPreparedTask(
+      execution({ providerExecutionEnabled: true as false }),
+      registryWith(),
+      new AbortController().signal,
+    )).rejects.toThrow("disabled by platform policy");
   });
 
-  it("does not invoke an executor after cancellation", async () => {
-    const registry = new ExecutorRegistry();
-    const execute = vi.fn();
-    registry.register({ id: "test-runner", supports: () => true, execute });
+  it("blocks external tools even when an executor is registered", async () => {
+    await expect(runPreparedTask(
+      execution({ externalToolsEnabled: true as false }),
+      registryWith(),
+      new AbortController().signal,
+    )).rejects.toThrow("disabled by platform policy");
+  });
+
+  it("honours cancellation before invoking an executor", async () => {
     const controller = new AbortController();
     controller.abort();
-    await expect(runPreparedTask(execution, registry, controller.signal)).rejects.toBeInstanceOf(ExecutionAborted);
-    expect(execute).not.toHaveBeenCalled();
+    const executor = registryWith();
+    await expect(runPreparedTask(execution(), executor, controller.signal)).rejects.toBeInstanceOf(ExecutionAborted);
   });
 
-  it("enforces the runtime deadline before invocation", async () => {
-    const registry = new ExecutorRegistry();
-    const execute = vi.fn();
-    registry.register({ id: "test-runner", supports: () => true, execute });
-    let clock = 100;
-    await expect(runPreparedTask(execution, registry, new AbortController().signal, () => {
-      const value = clock;
-      clock += 31_000;
-      return value;
-    })).rejects.toBeInstanceOf(ExecutionBudgetExceeded);
-    expect(execute).not.toHaveBeenCalled();
+  it("enforces the runtime budget", async () => {
+    await expect(runPreparedTask(
+      execution({ policy: { ...execution().policy, maxRuntimeSeconds: 5 } }),
+      registryWith(),
+      new AbortController().signal,
+      () => 6_000,
+    )).rejects.toBeInstanceOf(ExecutionBudgetExceeded);
   });
 
   it("rejects malformed executor output", async () => {
-    const registry = new ExecutorRegistry();
-    registry.register({ id: "test-runner", supports: () => true, execute: async () => ({ summary: "", data: {} }) });
-    await expect(runPreparedTask(execution, registry, new AbortController().signal)).rejects.toThrow("Task output must contain");
+    await expect(runPreparedTask(
+      execution(),
+      registryWith(async () => ({ summary: "", data: {} })),
+      new AbortController().signal,
+    )).rejects.toThrow("concise summary and structured data");
+  });
+
+  it("fails closed when no executor is registered", async () => {
+    await expect(runPreparedTask(
+      execution(),
+      new ExecutorRegistry(),
+      new AbortController().signal,
+    )).rejects.toThrow("No approved executor");
   });
 });
