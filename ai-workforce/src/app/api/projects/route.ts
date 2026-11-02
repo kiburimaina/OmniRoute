@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     if (!organizationId || !z.string().uuid().safeParse(organizationId).success) {
       return Response.json({ error: "A valid organizationId is required" }, { status: 400 });
     }
-    const projects = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client) => {
+    const projects = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client, userId) => {
       const result = await client.query(
         "SELECT id, organization_id AS \"organizationId\", name, description, created_at AS \"createdAt\" FROM projects WHERE organization_id = $1 ORDER BY created_at DESC",
         [organizationId],
@@ -41,7 +41,12 @@ export async function POST(request: Request) {
         "INSERT INTO projects (organization_id, name, description) VALUES ($1, $2, $3) RETURNING id, organization_id AS \"organizationId\", name, description, created_at AS \"createdAt\"",
         [input.organizationId, input.name, input.description],
       );
-      return result.rows[0];
+      const created = result.rows[0];
+      await client.query(
+        "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'project.created', 'project', $3, $4::jsonb)",
+        [input.organizationId, userId, created.id, JSON.stringify({ name: input.name })],
+      );
+      return created;
     });
     return Response.json({ project }, { status: 201 });
   } catch (error) {
