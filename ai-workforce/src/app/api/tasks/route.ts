@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { apiError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
+import { apiError, HttpError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -53,4 +53,34 @@ export async function POST(request: Request) {
   } catch (error) {
     return apiError(error);
   }
+}
+
+const CancelTask = z.object({ organizationId: z.string().uuid() });
+
+export async function PATCH(request: Request) {
+  try {
+    requireSameOrigin(request);
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id || !z.string().uuid().safeParse(id).success) return Response.json({ error: "A valid task id is required" }, { status: 400 });
+    const parsed = CancelTask.safeParse(await readJson(request));
+    if (!parsed.success) return Response.json({ error: "Invalid task cancellation request" }, { status: 400 });
+    const organizationId = parsed.data.organizationId;
+    const task = await withOrganization(organizationId, ["owner", "admin", "operator"], async (client, userId) => {
+      const result = await client.query(
+        "UPDATE tasks SET status = 'cancelled', locked_at = NULL, locked_by = NULL, updated_at = now() WHERE organization_id = $1 AND id = $2 AND status IN ('queued', 'running', 'waiting_approval') RETURNING id, status",
+        [organizationId, id],
+      );
+      if (!result.rowCount) throw new HttpError(409, "Task is missing or cannot be cancelled in its current state");
+      await client.query(
+        "UPDATE approvals SET status = 'rejected', decided_at = now(), decided_by = $2 WHERE organization_id = $1 AND task_id = $3 AND status = 'pending'",
+        [organizationId, userId, id],
+      );
+      await client.query(
+        "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'task.cancelled', 'task', $3, '{}'::jsonb)",
+        [organizationId, userId, id],
+      );
+      return result.rows[0];
+    });
+    return Response.json({ task });
+  } catch (error) { return apiError(error); }
 }
