@@ -17,7 +17,8 @@ describe("tenant-scoped task queue", () => {
     const task = { id: "task-1", organizationId: org, title: "Build", description: "", attemptCount: 1, maxAttempts: 3 };
     const { client, query } = clientWith([{ rows: [] }, { rows: [task], rowCount: 1 }]);
     await expect(claimNextTask(client, org, "worker-1")).resolves.toEqual(task);
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls[2][0]).toContain('INSERT INTO task_execution_attempts');
     expect(query.mock.calls[0][0]).toContain("set_config('app.current_org_id'");
     expect(query.mock.calls[1][0]).toContain("FOR UPDATE SKIP LOCKED");
   });
