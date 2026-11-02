@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     }
     const agents = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client) => {
       const result = await client.query(
-        "SELECT id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\" FROM agents WHERE organization_id = $1 ORDER BY created_at DESC",
+        "SELECT id, organization_id AS \"organizationId\", name, department, enabled, template_id AS \\"templateId\\", description, responsibilities, created_at AS \"createdAt\" FROM agents WHERE organization_id = $1 ORDER BY created_at DESC",
         [organizationId],
       );
       return result.rows;
@@ -82,7 +82,7 @@ export async function PATCH(request: Request) {
     const input = parsed.data;
     const agent = await withOrganization(input.organizationId, ["owner", "admin"], async (client, userId) => {
       const result = await client.query(
-        "UPDATE agents SET enabled = $1 WHERE organization_id = $2 AND id = $3 RETURNING id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\"",
+        "UPDATE agents SET enabled = $1 WHERE organization_id = $2 AND id = $3 RETURNING id, organization_id AS \"organizationId\", name, department, enabled, template_id AS \\"templateId\\", description, responsibilities, created_at AS \"createdAt\"",
         [input.enabled, input.organizationId, id],
       );
       if (!result.rowCount) throw new HttpError(404, "Agent not found");
