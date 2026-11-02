@@ -42,7 +42,12 @@ export async function POST(request: Request) {
         "INSERT INTO tasks (organization_id, project_id, title, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, organization_id AS \"organizationId\", project_id AS \"projectId\", title, description, status, created_at AS \"createdAt\"",
         [input.organizationId, input.projectId ?? null, input.title, input.description, userId],
       );
-      return result.rows[0];
+      const created = result.rows[0];
+      await client.query(
+        "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'task.created', 'task', $3, $4::jsonb)",
+        [input.organizationId, userId, created.id, JSON.stringify({ title: input.title, projectId: input.projectId ?? null })],
+      );
+      return created;
     });
     return Response.json({ task }, { status: 201 });
   } catch (error) {
