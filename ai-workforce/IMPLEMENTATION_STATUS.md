@@ -8,23 +8,27 @@
 - [x] Zod domain contracts for organizations, projects, tasks, and approvals.
 - [x] Initial PostgreSQL schema and tenant-scoped RLS policies.
 - [x] PostgreSQL connection pool with bounded pool size and timeouts.
-- [x] JWT cookie verification with fixed HS256 algorithm, issuer, audience, UUID subject, and minimum 32-byte secret validation.
+- [x] Better Auth self-hosted email/password configuration with UUID IDs and 12-hour sessions.
+- [x] Better Auth route handler and browser client.
+- [x] Sign-in and sign-up screens.
+- [x] Authenticated organization listing and atomic organization creation/owner assignment.
+- [x] First-workspace onboarding screen.
+- [x] Separate authentication and business-data database connection strings.
 - [x] Membership verification before transaction-local tenant context is set.
 - [x] Tenant-scoped project and task list/create API routes.
 - [x] Same-origin checks for cookie-authenticated mutations and bounded 64 KiB JSON parsing.
 - [x] Health endpoint and environment template.
 - [x] API/authentication contract documented.
-- [ ] Trusted identity provider and login/session issuance.
-- [x] Basic CSRF defense (Origin + Fetch Metadata) and bounded JSON request bodies.
+- [ ] Apply Better Auth schema migration in a configured database.
+- [ ] Protect dashboard and all workspace pages with server-side session checks.
+- [ ] Trusted email verification and password reset delivery.
 - [ ] Distributed rate limiting and production CSRF review.
-- [ ] Database migration runner.
-- [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain a DBA task.
-- [ ] Automated integration tests, including cross-tenant isolation.
-- [x] Audit-event writes for project and task creation (same transaction as the mutation).
-- [x] GitHub Actions typecheck/lint/build workflow configured; execution result pending.
+- [ ] Database migration runner and reviewed release process.
+- [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain an operator task.
+- [ ] Automated integration tests, including sign-up/sign-in and cross-tenant isolation.
+- [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
+- [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
 
 ## Safety status
 
-The APIs fail closed when no valid session is present. No login/token-issuing service is implemented yet. The dashboard remains a preview and must not be exposed publicly as a finished product. Before production, configure a trusted identity provider, CSRF defenses, database grants, migration execution, and automated tenant-isolation tests.
-
-No OmniRoute provider credentials, paid model calls, customer messaging, merges, or deployments have been enabled.
+Authentication and onboarding code is committed, but the database schema migration has not been run and no live database is configured. Do not expose the dashboard publicly yet. No paid services, provider credentials, customer messaging, merges, or deployments have been enabled.
