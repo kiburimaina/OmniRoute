@@ -1,56 +1,28 @@
 import { z } from "zod";
 import { apiError, readJson, withWorkerTransaction } from "@/lib/db";
-import { completeTask, failTask, type TaskOutput } from "@/lib/task-queue";
-import { prepareTaskExecution } from "@/lib/agent-runtime";
-import { InvalidWorkflowOutput, validateTaskOutput } from "@/lib/workflow-output";
+import { failTask } from "@/lib/task-queue";
 import { requireWorkerAuthentication, requireWorkerOrganizationAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
-const ResultRequest = z.discriminatedUnion("outcome", [
-  z.object({
-    organizationId: z.string().uuid(),
-    taskId: z.string().uuid(),
-    workerId: z.string().regex(/^[a-zA-Z0-9._:-]{1,120}$/),
-    outcome: z.literal("succeeded"),
-    output: z.object({
-      summary: z.string().trim().min(1).max(2000),
-      data: z.record(z.string(), z.unknown()).default({}),
-    }).strict(),
-  }).strict(),
-  z.object({
-    organizationId: z.string().uuid(),
-    taskId: z.string().uuid(),
-    workerId: z.string().regex(/^[a-zA-Z0-9._:-]{1,120}$/),
-    outcome: z.literal("failed"),
-    error: z.string().trim().min(1).max(4000),
-  }).strict(),
-]);
+const FailureRequest = z.object({
+  organizationId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  workerId: z.string().regex(/^[a-zA-Z0-9._:-]{1,120}$/),
+  outcome: z.literal("failed"),
+  error: z.string().trim().min(1).max(4000),
+}).strict();
 
 export async function POST(request: Request) {
   try {
     requireWorkerAuthentication(request);
-    const parsed = ResultRequest.safeParse(await readJson(request));
-    if (!parsed.success) return Response.json({ error: "Invalid worker result" }, { status: 400 });
+    const parsed = FailureRequest.safeParse(await readJson(request));
+    if (!parsed.success) {
+      return Response.json({ error: "Only failure reports are accepted here; use the execute endpoint for task success" }, { status: 400 });
+    }
     const input = parsed.data;
     requireWorkerOrganizationAccess(input.organizationId);
     const result = await withWorkerTransaction(input.organizationId, async (client) => {
-      if (input.outcome === "succeeded") {
-        const execution = await prepareTaskExecution(client, input.organizationId, input.taskId, input.workerId);
-        let validatedOutput: TaskOutput;
-        try { validatedOutput = validateTaskOutput(execution, input.output); }
-        catch (error) {
-          if (error instanceof InvalidWorkflowOutput) return { accepted: false as const, invalidOutput: true as const, message: error.message };
-          throw error;
-        }
-        const completed = await completeTask(client, input.organizationId, input.taskId, input.workerId, validatedOutput);
-        if (!completed) return { accepted: false as const };
-        await client.query(
-          "INSERT INTO audit_events (organization_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, 'agent', 'worker.task_succeeded', 'task', $2, $3::jsonb)",
-          [input.organizationId, input.taskId, JSON.stringify({ workerId: input.workerId })],
-        );
-        return { accepted: true as const, status: "succeeded" as const };
-      }
       const status = await failTask(client, input.organizationId, input.taskId, input.workerId, input.error);
       if (status === "not_owned") return { accepted: false as const };
       await client.query(
@@ -59,7 +31,6 @@ export async function POST(request: Request) {
       );
       return { accepted: true as const, status };
     });
-    if (!result.accepted && "invalidOutput" in result && result.invalidOutput) return Response.json({ error: result.message }, { status: 422 });
     if (!result.accepted) return Response.json({ error: "Task lease is not owned by this worker" }, { status: 409 });
     return Response.json(result);
   } catch (error) {
