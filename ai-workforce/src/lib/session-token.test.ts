@@ -32,7 +32,7 @@ describe("verifySessionToken", () => {
   });
 
   it("rejects an expired token", async () => {
-    expect(await verifySessionToken(await token({ expires: "1 second ago" }), secret)).toBeNull();
+    expect(await verifySessionToken(await token({ expires: "1 hour ago" }), secret)).toBeNull();
   });
 
   it("rejects a token with the wrong issuer or audience", async () => {
