@@ -70,7 +70,7 @@ describe("safe execution gate", () => {
       execution({ policy: { ...execution().policy, maxRuntimeSeconds: 5 } }),
       registryWith(),
       new AbortController().signal,
-      () => 6_000,
+      vi.fn().mockReturnValueOnce(0).mockReturnValue(6_000),
     )).rejects.toBeInstanceOf(ExecutionBudgetExceeded);
   });
 
