@@ -49,6 +49,11 @@
 - [x] Backend approval requests accept only supported consequential action categories and validate them against the task workflow/agent policy.
 - [x] Approval requests lock tasks, prevent duplicate pending requests, and record the requester; self-approval is blocked for owner/admin decisions.
 - [x] Unit tests cover supported action categories, workflow policy matching, custom agent policy, and fail-closed unknown workflows.
+- [x] Durable task execution attempt history, structured JSON results, lifecycle timestamps, and bounded error persistence.
+- [x] Authenticated worker result endpoint enforces organization allowlist and active lease ownership for success/failure reports.
+- [x] Expired lease recovery closes attempt history with `lease_expired` and applies bounded task retry policy.
+- [x] Workspace task cards expose structured result, attempt counters, latest failure, and completion time; tenant-scoped attempt history API added.
+- [x] CI and database role runbooks grant least-privilege access to the new execution-history table.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
