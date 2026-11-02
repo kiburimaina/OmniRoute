@@ -8,16 +8,19 @@
 - [x] Zod domain contracts for organizations, projects, tasks, and approvals.
 - [x] Initial PostgreSQL schema and tenant-scoped RLS policies.
 - [x] PostgreSQL connection pool with bounded pool size and timeouts.
-- [x] JWT cookie verification with fixed HS256 algorithm, issuer, audience, and UUID subject validation.
+- [x] JWT cookie verification with fixed HS256 algorithm, issuer, audience, UUID subject, and minimum 32-byte secret validation.
 - [x] Membership verification before transaction-local tenant context is set.
 - [x] Tenant-scoped project and task list/create API routes.
+- [x] Same-origin checks for cookie-authenticated mutations and bounded 64 KiB JSON parsing.
 - [x] Health endpoint and environment template.
 - [x] API/authentication contract documented.
 - [ ] Trusted identity provider and login/session issuance.
-- [ ] CSRF protection, rate limiting, and request-size limits.
+- [x] Basic CSRF defense (Origin + Fetch Metadata) and bounded JSON request bodies.
+- [ ] Distributed rate limiting and production CSRF review.
 - [ ] Database migration runner and least-privilege role provisioning.
 - [ ] Automated integration tests, including cross-tenant isolation.
-- [ ] Audit-event writes and CI verification.
+- [ ] Audit-event writes.
+- [x] GitHub Actions typecheck/lint/build workflow configured; execution result pending.
 
 ## Safety status
 
