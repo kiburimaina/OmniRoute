@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { PoolClient } from "pg";
+import { getWorkflow } from "./department-workflows";
 
 const AgentPolicySchema = z.object({
   maxSteps: z.number().int().min(1).max(20).default(8),
@@ -15,6 +16,8 @@ export type PreparedExecution = {
   taskId: string;
   agentId: string;
   department: "development" | "sales" | "operations";
+  workflow: ReturnType<typeof getWorkflow>;
+  workflowInput: Record<string, unknown>;
   policy: AgentExecutionPolicy;
   providerExecutionEnabled: false;
   externalToolsEnabled: false;
@@ -33,11 +36,11 @@ export async function prepareTaskExecution(
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new ExecutionDenied("Invalid organization scope");
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const result = await client.query<{
-    taskId: string; agentId: string | null; taskStatus: string; lockedBy: string | null;
+    taskId: string; agentId: string | null; taskStatus: string; lockedBy: string | null; workflowId: string | null; workflowInput: Record<string, unknown>;
     agentEnabled: boolean | null; department: "development" | "sales" | "operations" | null; policy: unknown;
   }>(
     `SELECT t.id AS "taskId", t.assigned_agent_id AS "agentId", t.status AS "taskStatus",
-       t.locked_by AS "lockedBy", a.enabled AS "agentEnabled", a.department, a.policy
+       t.locked_by AS "lockedBy", t.workflow_id AS "workflowId", t.workflow_input AS "workflowInput", a.enabled AS "agentEnabled", a.department, a.policy
      FROM tasks t LEFT JOIN agents a
        ON a.organization_id = t.organization_id AND a.id = t.assigned_agent_id
      WHERE t.organization_id = $1 AND t.id = $2`,
@@ -50,12 +53,16 @@ export async function prepareTaskExecution(
   if (!task.agentId || task.agentEnabled !== true || !task.department) {
     throw new ExecutionDenied("Task has no enabled assigned agent");
   }
+  const workflow = task.workflowId ? getWorkflow(task.workflowId) : undefined;
+  if (task.workflowId && (!workflow || workflow.department !== task.department)) throw new ExecutionDenied("Task workflow is missing or incompatible with its assigned agent");
   const parsed = AgentPolicySchema.safeParse(task.policy ?? {});
   if (!parsed.success) throw new ExecutionDenied("Agent policy is invalid; execution is blocked");
   return {
     taskId: task.taskId,
     agentId: task.agentId,
     department: task.department,
+    workflow,
+    workflowInput: task.workflowInput ?? {},
     policy: parsed.data,
     providerExecutionEnabled: false,
     externalToolsEnabled: false,
