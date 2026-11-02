@@ -1,15 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { withUserTransaction } from "@/lib/db";
+import { withOrganization, withUserTransaction } from "@/lib/db";
 import { SignOutButton } from "@/components/sign-out-button";
-
-const metrics = [
-  ["Active agents", "0", "Agents are disabled until configured"],
-  ["Open tasks", "0", "No tasks have been submitted"],
-  ["Awaiting approval", "0", "Sensitive actions require your review"],
-  ["Provider spend", "$0.00", "Paid providers are disabled by default"],
-];
 
 const departments = [
   { name: "Development", detail: "Architecture, frontend, backend, database, QA, and security work.", state: "Not configured" },
@@ -23,11 +16,9 @@ export default async function HomePage() {
 
   const organizations = await withUserTransaction(async (client, userId) => {
     const result = await client.query(
-      `SELECT o.id, o.name, m.role
-       FROM organizations o
+      `SELECT o.id, o.name, m.role FROM organizations o
        JOIN organization_members m ON m.organization_id = o.id
-       WHERE m.user_id = $1
-       ORDER BY o.created_at ASC`,
+       WHERE m.user_id = $1 ORDER BY o.created_at ASC`,
       [userId],
     );
     return result.rows as Array<{ id: string; name: string; role: string }>;
@@ -35,6 +26,21 @@ export default async function HomePage() {
 
   if (organizations.length === 0) redirect("/onboarding");
   const organization = organizations[0];
+  const counts = await withOrganization(organization.id, ["owner", "admin", "operator", "viewer"], async (client) => {
+    const [agents, tasks, approvals] = await Promise.all([
+      client.query("SELECT count(*)::int AS count FROM agents WHERE organization_id = $1 AND enabled = true", [organization.id]),
+      client.query("SELECT count(*)::int AS count FROM tasks WHERE organization_id = $1 AND status IN ('queued','running')", [organization.id]),
+      client.query("SELECT count(*)::int AS count FROM approvals WHERE organization_id = $1 AND status = 'pending'", [organization.id]),
+    ]);
+    return { agents: agents.rows[0].count, tasks: tasks.rows[0].count, approvals: approvals.rows[0].count };
+  });
+
+  const metrics = [
+    ["Active agents", String(counts.agents), "Enabled agents in this workspace"],
+    ["Open tasks", String(counts.tasks), "Queued or currently running"],
+    ["Awaiting approval", String(counts.approvals), "Actions waiting for your review"],
+    ["Provider spend", "$0.00", "Paid providers remain disabled"],
+  ];
 
   return (
     <div className="shell">
@@ -53,7 +59,7 @@ export default async function HomePage() {
       <main className="main">
         <div className="topline">
           <div>
-            <div className="eyebrow">Command centre · {organization.name}</div>
+            <div className="eyebrow">Command centre · {organization.name} · {organization.role}</div>
             <h1>Good to have you here, {session.user.name}.</h1>
             <p className="sub">Your AI teams, projects, and business operations in one place.</p>
           </div>
@@ -81,7 +87,7 @@ export default async function HomePage() {
           </div>
         </section>
         <div className="notice">
-          Safety mode is active. No agent can send customer messages, spend money, merge code, or deploy software from this preview. Authentication is enabled, but database migrations, email verification, and tenant-isolation tests remain before production.
+          Safety mode is active. No agent can send customer messages, spend money, merge code, or deploy software. The dashboard reads live counts from this workspace; provider spend is zero because model execution is not enabled.
         </div>
       </main>
     </div>
