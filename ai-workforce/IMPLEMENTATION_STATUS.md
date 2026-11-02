@@ -17,9 +17,10 @@
 - [ ] Trusted identity provider and login/session issuance.
 - [x] Basic CSRF defense (Origin + Fetch Metadata) and bounded JSON request bodies.
 - [ ] Distributed rate limiting and production CSRF review.
-- [ ] Database migration runner and least-privilege role provisioning.
+- [ ] Database migration runner.
+- [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain a DBA task.
 - [ ] Automated integration tests, including cross-tenant isolation.
-- [ ] Audit-event writes.
+- [x] Audit-event writes for project and task creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; execution result pending.
 
 ## Safety status
