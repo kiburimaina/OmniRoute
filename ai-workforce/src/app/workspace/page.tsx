@@ -20,12 +20,13 @@ export default async function WorkspacePage() {
  if(!organizations.length) redirect("/onboarding");
  const organization=organizations[0];
  const data=await withOrganization(organization.id,["owner","admin","operator","viewer"],async(client)=>{
-  const [p,t,a]=await Promise.all([
+  const [p,t,a,g]=await Promise.all([
    client.query(`SELECT id,name,description FROM projects WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 100`,[organization.id]),
    client.query(`SELECT id,title,status,project_id AS "projectId" FROM tasks WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 100`,[organization.id]),
    client.query(`SELECT id,task_id AS "taskId",action,details,status FROM approvals WHERE organization_id=$1 ORDER BY requested_at DESC LIMIT 100`,[organization.id]),
+   client.query(`SELECT id,name,department FROM agents WHERE organization_id=$1 AND enabled=true ORDER BY name ASC`,[organization.id]),
   ]);
-  return {projects:p.rows,tasks:t.rows,approvals:a.rows};
+  return {projects:p.rows,tasks:t.rows,approvals:a.rows,agents:g.rows};
  });
  const canWrite=["owner","admin","operator"].includes(organization.role);
  const canApprove=["owner","admin"].includes(organization.role);
@@ -36,7 +37,7 @@ export default async function WorkspacePage() {
   </aside>
   <main className="main"><div className="topline"><div><div className="eyebrow">Workspace operations · {organization.role}</div><h1>Projects, tasks & approvals</h1><p className="sub">Plan work, track task status, and review requests that require human approval.</p></div><Link className="pill" href="/">Command centre</Link></div>
    <div className="notice">Safe mode: creating records and recording approval decisions does not run agents, call models, send messages, or perform external actions.</div>
-   <WorkspaceManager organizationId={organization.id} initialProjects={data.projects} initialTasks={data.tasks} initialApprovals={data.approvals} canWrite={canWrite} canApprove={canApprove}/>
+   <WorkspaceManager organizationId={organization.id} initialProjects={data.projects} initialTasks={data.tasks} initialApprovals={data.approvals} availableAgents={data.agents} canWrite={canWrite} canApprove={canApprove}/>
   </main>
  </div>;
 }
