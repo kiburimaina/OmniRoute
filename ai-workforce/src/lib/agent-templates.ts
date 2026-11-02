@@ -1,4 +1,4 @@
-import type { AgentExecutionPolicy } from "./agent-runtime";
+type AgentExecutionPolicy = { maxSteps: number; maxRuntimeSeconds: number; maxOutputTokens: number; allowedTools: string[]; requireApprovalFor: string[] };
 
 export type AgentTemplate = {
   id: string;
