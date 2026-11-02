@@ -17,10 +17,23 @@ export default function SignUpPage() {
     event.preventDefault();
     setError("");
     setBusy(true);
-    const result = await authClient.signUp.email({ name, email, password, callbackURL: "/sign-in" });
-    setBusy(false);
-    if (result.error) setError(result.error.message || "Unable to create account.");
-    else router.replace("/sign-in?registered=1");
+    try {
+      const result = await authClient.signUp.email({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        callbackURL: "/sign-in",
+      });
+      if (result.error) {
+        setError(result.error.message || "Unable to create account.");
+        return;
+      }
+      router.replace("/sign-in?registered=1");
+    } catch {
+      setError("We could not reach the authentication service. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
