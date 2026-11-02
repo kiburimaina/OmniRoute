@@ -96,3 +96,21 @@ export function apiError(error: unknown): Response {
   if (error instanceof HttpError) return Response.json({ error: error.message }, { status: error.status });
   return Response.json({ error: "Internal server error" }, { status: 500 });
 }
+
+export async function withWorkerTransaction<T>(
+  organizationId: string,
+  work: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new HttpError(400, "Invalid organization id");
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally { client.release(); }
+}
