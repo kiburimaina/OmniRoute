@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { apiError, withOrganization } from "@/lib/db";
+import { apiError, readJson, withOrganization } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const parsed = CreateTask.safeParse(await request.json());
+    const parsed = CreateTask.safeParse(await readJson(request));
     if (!parsed.success) {
       return Response.json({ error: "Invalid task details", details: parsed.error.flatten() }, { status: 400 });
     }
