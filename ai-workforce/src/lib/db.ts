@@ -26,15 +26,61 @@ export class HttpError extends Error {
   }
 }
 
-/** Parse JSON consistently so malformed bodies are client errors, not 500s. */
+const MAX_JSON_BYTES = 64 * 1024;
+
+/** Require a same-origin browser request for cookie-authenticated mutations. */
+export function requireSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  const expectedOrigin = process.env.APP_ORIGIN ?? new URL(request.url).origin;
+  if (!origin || origin !== expectedOrigin) {
+    throw new HttpError(403, "Cross-origin request rejected");
+  }
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
+    throw new HttpError(403, "Cross-site request rejected");
+  }
+}
+
+/** Parse bounded JSON consistently so malformed or oversized bodies are client errors. */
 export async function readJson(request: Request): Promise<unknown> {
   const contentType = request.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
   if (contentType !== "application/json") {
     throw new HttpError(415, "Content-Type must be application/json");
   }
+  const declaredLength = Number(request.headers.get("content-length") ?? 0);
+  if (declaredLength > MAX_JSON_BYTES) {
+    throw new HttpError(413, "Request body is too large");
+  }
+  if (!request.body) throw new HttpError(400, "Request body is required");
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    return await request.json();
-  } catch {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_JSON_BYTES) {
+        await reader.cancel();
+        throw new HttpError(413, "Request body is too large");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  try {
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(400, "Request body must contain valid JSON");
   }
 }
