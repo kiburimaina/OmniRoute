@@ -117,11 +117,17 @@ export async function recoverExpiredLeases(
     `UPDATE tasks SET
        status = CASE WHEN attempt_count < max_attempts THEN 'queued' ELSE 'failed' END,
        available_at = now(), locked_at = NULL, locked_by = NULL,
-       last_error = COALESCE(last_error, 'Worker lease expired'), updated_at = now()
+       last_error = COALESCE(last_error, 'Worker lease expired'),
+       completed_at = CASE WHEN attempt_count >= max_attempts THEN now() ELSE NULL END,
+       updated_at = now()
      WHERE organization_id = $1 AND status = 'running'
-       AND locked_at < now() - make_interval(secs => $2)`,
+       AND locked_at < now() - make_interval(secs => $2)
+     RETURNING id, attempt_count`,
     [organizationId, seconds],
   );
+  for (const expired of result.rows as Array<{ id: string; attempt_count: number }>) {
+    await client.query("UPDATE task_execution_attempts SET status = 'lease_expired', error_message = 'Worker lease expired', finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND attempt_number = $3 AND status = 'running'", [organizationId, expired.id, expired.attempt_count]);
+  }
   return result.rowCount ?? 0;
 }
 
