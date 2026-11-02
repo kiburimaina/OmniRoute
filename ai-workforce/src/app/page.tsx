@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { withUserTransaction } from "@/lib/db";
+import { SignOutButton } from "@/components/sign-out-button";
 
 const metrics = [
   ["Active agents", "0", "Agents are disabled until configured"],
@@ -47,7 +48,7 @@ export default async function HomePage() {
         <div className="nav-label">Manage</div>
         <a className="nav-item" href="#projects">Projects</a>
         <a className="nav-item" href="#settings">Settings</a>
-        <form action="/api/auth/sign-out" method="post"><button className="nav-item signout" type="submit">Sign out</button></form>
+        <SignOutButton />
       </aside>
       <main className="main">
         <div className="topline">
