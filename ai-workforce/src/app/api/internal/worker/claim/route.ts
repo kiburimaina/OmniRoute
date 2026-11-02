@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       const execution = await prepareTaskExecution(client, organizationId, task.id, workerId);
       return { task, execution };
     });
-    if (!result) return Response.json({ task: null }, { status: 204 });
+    if (!result) return Response.json({ task: null });
     return Response.json({
       task: result.task,
       execution: {
