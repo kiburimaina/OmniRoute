@@ -2,7 +2,7 @@ import { z } from "zod";
 import { apiError, readJson, withWorkerTransaction } from "@/lib/db";
 import { prepareTaskExecution } from "@/lib/agent-runtime";
 import { claimNextTask } from "@/lib/task-queue";
-import { requireWorkerAuthentication, requireWorkerOrganizationAccess } from "@/lib/worker-auth";
+import { getWorkerMaxConcurrency, requireWorkerAuthentication, requireWorkerOrganizationAccess } from "@/lib/worker-auth";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { organizationId, workerId } = parsed.data;
     requireWorkerOrganizationAccess(organizationId);
     const result = await withWorkerTransaction(organizationId, async (client) => {
-      const task = await claimNextTask(client, organizationId, workerId);
+      const task = await claimNextTask(client, organizationId, workerId, getWorkerMaxConcurrency());
       if (!task) return null;
       const execution = await prepareTaskExecution(client, organizationId, task.id, workerId);
       await client.query(
