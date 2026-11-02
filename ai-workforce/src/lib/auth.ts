@@ -5,6 +5,8 @@ import { z } from "zod";
 
 const SessionClaims = z.object({
   sub: z.string().uuid(),
+  exp: z.number().int().positive(),
+  iat: z.number().int().positive(),
 });
 
 export async function getSessionUserId(): Promise<string | null> {
@@ -22,6 +24,9 @@ export async function getSessionUserId(): Promise<string | null> {
       algorithms: ["HS256"],
       issuer: process.env.AUTH_ISSUER ?? "ai-workforce",
       audience: process.env.AUTH_AUDIENCE ?? "ai-workforce-app",
+      requiredClaims: ["exp", "iat", "sub"],
+      maxTokenAge: "12h",
+      clockTolerance: 5,
     });
     const claims = SessionClaims.safeParse(payload);
     return claims.success ? claims.data.sub : null;
