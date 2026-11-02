@@ -4,7 +4,9 @@ import { authorizeApprovedAction } from "../src/lib/approved-action-boundary";
 function clientMock() {
   const query = vi.fn()
     .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: "approval-1" }] })
-    .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: "reservation-1", amount_micros: "250" }] })
+    .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+    .mockResolvedValueOnce({ rowCount: 1, rows: [{ organization_id: "org-1" }] })
+    .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: "reservation-1" }] })
     .mockResolvedValueOnce({ rowCount: 1, rows: [{ payload_hash: "a".repeat(64) }] })
     .mockResolvedValueOnce({ rowCount: 1, rows: [] });
   return { query } as unknown as import("pg").PoolClient & { query: typeof query };
@@ -22,10 +24,10 @@ describe("approved action boundary", () => {
     });
     expect(result.approvalId).toBe("approval-1");
     expect(result.reservation).toEqual({ id: "reservation-1", amountMicros: 250 });
-    expect(client.query).toHaveBeenCalledTimes(4);
+    expect(client.query).toHaveBeenCalledTimes(6);
     expect(String(client.query.mock.calls[0][0])).toContain("UPDATE approvals");
-    expect(String(client.query.mock.calls[1][0])).toContain("organization_spend_budgets");
-    expect(String(client.query.mock.calls[3][0])).toContain("audit_events");
+    expect(String(client.query.mock.calls[2][0])).toContain("organization_spend_budgets");
+    expect(String(client.query.mock.calls[5][0])).toContain("audit_events");
   });
 
   it("rejects unapproved action categories before touching the database", async () => {
