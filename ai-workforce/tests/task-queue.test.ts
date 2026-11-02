@@ -30,15 +30,17 @@ describe("tenant-scoped task queue", () => {
   });
 
   it("only completes a task owned by the worker lease", async () => {
-    const { client, query } = clientWith([{ rowCount: 1 }]);
+    const { client, query } = clientWith([{ rows: [] }, { rowCount: 1 }]);
     await expect(completeTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
-    expect(query.mock.calls[0][0]).toContain("locked_by = $3");
+    expect(query.mock.calls[0][0]).toContain("set_config");
+    expect(query.mock.calls[1][0]).toContain("locked_by = $3");
   });
 
   it("returns retry state from the bounded exponential retry update", async () => {
-    const { client, query } = clientWith([{ rows: [{ status: "queued" }], rowCount: 1 }]);
+    const { client, query } = clientWith([{ rows: [] }, { rows: [{ status: "queued" }], rowCount: 1 }]);
     await expect(failTask(client, org, "task-1", "worker-1", "temporary error")).resolves.toBe("queued");
-    expect(query.mock.calls[0][0]).toContain("LEAST(300");
+    expect(query.mock.calls[0][0]).toContain("set_config");
+    expect(query.mock.calls[1][0]).toContain("LEAST(300");
   });
 
   it("bounds lease recovery duration and scopes it to the organization", async () => {
