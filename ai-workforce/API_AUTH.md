@@ -1,31 +1,53 @@
 # API and Authentication Contract
 
-## Session
+## Authentication
 
-The API accepts a signed JWT in the HttpOnly cookie named `aw_session`. Required claims are `sub` (user UUID), `iss` (AUTH_ISSUER), `aud` (AUTH_AUDIENCE), and `exp`. Only HS256 is accepted. Keep AUTH_SECRET private and use short session lifetimes.
+The application uses self-hosted Better Auth with email/password sign-in. Better Auth stores users, sessions, accounts, and verification records in PostgreSQL through AUTH_DATABASE_URL. The auth connection is intentionally separate from DATABASE_URL so the identity subsystem does not require broad privileges on business tables.
 
-The app does not yet include login, registration, password reset, OAuth callbacks, or a token-issuing endpoint. Until a trusted session issuer is integrated, project and task endpoints fail closed with 401. Production cookies must be HttpOnly, Secure, SameSite=Lax or stricter. The current POST routes require an exact Origin match and reject cross-site Fetch Metadata when present. Set APP_ORIGIN to the exact public origin in production; the request URL origin is only a development fallback. JSON bodies are capped at 64 KiB. These controls are defense in depth, not a replacement for an identity provider and a full CSRF review.
+Required environment:
+- AUTH_DATABASE_URL — PostgreSQL connection for Better Auth tables.
+- BETTER_AUTH_SECRET — random secret of at least 32 bytes; never commit it.
+- BETTER_AUTH_URL — canonical application URL in deployed environments.
+- APP_ORIGIN — exact trusted browser origin used by mutation endpoints.
+- DATABASE_URL — least-privilege business-data connection.
+- AUTH_DATABASE_SSL / DATABASE_SSL — set true with verified TLS in hosted environments.
 
-## Endpoints
+Email/password registration requires a 12-character minimum password. Sessions expire after 12 hours and the cookie cache is short-lived. Account creation does not automatically create a workspace; the user completes onboarding after sign-in.
 
+Better Auth schema must be created against AUTH_DATABASE_URL before first use:
+`npx auth@latest migrate`
+Run this from the ai-workforce directory in an environment where AUTH_DATABASE_URL and BETTER_AUTH_SECRET are configured. This migration is a deliberate operator action; it is not run by CI or application startup.
+
+## Routes
+
+- GET/POST /api/auth/[...all] — Better Auth handlers (sign-up, sign-in, sign-out, session).
+- GET /api/organizations — list organizations for the authenticated user.
+- POST /api/organizations — create an organization and assign the creator the owner role atomically.
 - GET /api/health — service status and environment readiness flags; no secrets are returned.
 - GET /api/projects?organizationId=<uuid> — list projects for a verified organization member.
 - POST /api/projects — JSON: { organizationId, name, description }. Requires owner, admin, or operator.
 - GET /api/tasks?organizationId=<uuid> — list up to 100 recent tasks for a verified member.
 - POST /api/tasks — JSON: { organizationId, projectId, title, description }. Requires owner, admin, or operator.
 
-Organization IDs are untrusted input. The server verifies membership before setting transaction-local RLS context. Tenant-owned database access must go through withOrganization. SQL is parameterized.
+## Tenant security
+
+Organization IDs are untrusted input. The server verifies membership before setting transaction-local RLS context. Tenant-owned database access must go through withOrganization. SQL is parameterized. The authentication database connection is separate from the business-data pool.
+
+POST business and onboarding routes require exact Origin validation, Fetch Metadata checks when present, and JSON bodies capped at 64 KiB. These are defense-in-depth controls and still require a production CSRF review and rate limiting.
 
 ## Database setup
 
-Apply db/migrations/0001_initial.sql to a dedicated PostgreSQL database. The application role must not own tenant tables and must not have BYPASSRLS. Grant only required privileges. The server membership lookup requires SELECT on organization_members.
+1. Apply db/migrations/0001_initial.sql to a dedicated PostgreSQL database as the migration owner.
+2. Run Better Auth's schema migration against AUTH_DATABASE_URL.
+3. Provision separate least-privilege auth and business application roles using db/ROLE_SETUP.md.
+4. Ensure the business app role does not own tenant tables and does not have BYPASSRLS.
 
 ## Production blockers
 
-- Integrate a real identity provider and trusted session issuer.
-- Integrate a real identity provider and implement login/logout, session rotation, and review CSRF protections for every mutation route.
-- Add distributed rate limiting and endpoint-specific request-size limits.
-- Add migration tooling and least-privilege database role provisioning.
-- Add integration tests proving cross-tenant access is denied.
-- Add audit-event writes for privileged actions.
+- Verify email before enabling sensitive account capabilities; configure a real email delivery provider.
+- Add password reset and account recovery delivery/configuration.
+- Add distributed rate limiting for authentication and application APIs.
+- Add integration tests proving sign-up/sign-in and cross-tenant isolation against PostgreSQL.
+- Add migration automation with explicit release approval.
+- Add audit-event coverage for privileged actions.
 - Add secure secret management, monitoring, backups, and restore tests.
