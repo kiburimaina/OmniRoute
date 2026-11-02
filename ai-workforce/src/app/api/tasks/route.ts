@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiError, HttpError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
+import { getWorkflow } from "@/lib/department-workflows";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,8 @@ const CreateTask = z.object({
   organizationId: z.string().uuid(),
   projectId: z.string().uuid().nullable().optional(),
   assignedAgentId: z.string().uuid().nullable().optional(),
+  workflowId: z.string().min(1).max(80).nullable().optional(),
+  workflowInput: z.record(z.string(), z.unknown()).default({}),
   title: z.string().trim().min(1).max(200),
   description: z.string().max(10000).default(""),
 });
@@ -39,18 +42,22 @@ export async function POST(request: Request) {
     }
     const input = parsed.data;
     const task = await withOrganization(input.organizationId, ["owner", "admin", "operator"], async (client, userId) => {
+      const workflow = input.workflowId ? getWorkflow(input.workflowId) : undefined;
+      if (input.workflowId && !workflow) throw new HttpError(400, "Unknown department workflow");
+      if (input.workflowId && !input.assignedAgentId) throw new HttpError(400, "A workflow requires an assigned agent");
       if (input.assignedAgentId) {
-        const agent = await client.query("SELECT id FROM agents WHERE organization_id = $1 AND id = $2 AND enabled = true", [input.organizationId, input.assignedAgentId]);
+        const agent = await client.query("SELECT id, department FROM agents WHERE organization_id = $1 AND id = $2 AND enabled = true", [input.organizationId, input.assignedAgentId]);
         if (!agent.rowCount) throw new HttpError(400, "Assigned agent must exist in this organization and be enabled");
+        if (workflow && agent.rows[0].department !== workflow.department) throw new HttpError(400, "Workflow department must match the assigned agent");
       }
       const result = await client.query(
-        "INSERT INTO tasks (organization_id, project_id, assigned_agent_id, title, description, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id AS \"organizationId\", project_id AS \"projectId\", title, description, status, created_at AS \"createdAt\"",
-        [input.organizationId, input.projectId ?? null, input.assignedAgentId ?? null, input.title, input.description, userId],
+        "INSERT INTO tasks (organization_id, project_id, assigned_agent_id, workflow_id, workflow_input, title, description, created_by) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8) RETURNING id, organization_id AS \"organizationId\", project_id AS \"projectId\", assigned_agent_id AS \"assignedAgentId\", workflow_id AS \"workflowId\", workflow_input AS \"workflowInput\", title, description, status, created_at AS \"createdAt\"",
+        [input.organizationId, input.projectId ?? null, input.assignedAgentId ?? null, workflow?.id ?? null, JSON.stringify(input.workflowInput), input.title, input.description, userId],
       );
       const created = result.rows[0];
       await client.query(
         "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'task.created', 'task', $3, $4::jsonb)",
-        [input.organizationId, userId, created.id, JSON.stringify({ title: input.title, projectId: input.projectId ?? null, assignedAgentId: input.assignedAgentId ?? null })],
+        [input.organizationId, userId, created.id, JSON.stringify({ title: input.title, projectId: input.projectId ?? null, assignedAgentId: input.assignedAgentId ?? null, workflowId: workflow?.id ?? null })],
       );
       return created;
     });
