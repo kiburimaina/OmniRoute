@@ -24,6 +24,8 @@ export function validateTaskOutput(execution: PreparedExecution, output: TaskOut
     data: z.record(z.string().min(1).max(80), z.unknown()),
   }).strict().safeParse(output);
   if (!parsed.success) throw new InvalidWorkflowOutput("Task output must contain a concise summary and structured data");
+  const encodedSize = new TextEncoder().encode(JSON.stringify(parsed.data)).byteLength;
+  if (encodedSize > 48 * 1024) throw new InvalidWorkflowOutput("Structured task output exceeds the 48 KiB storage limit");
   if (!execution.workflow) return parsed.data as TaskOutput;
 
   const sections = z.record(z.string(), SectionValue).safeParse(parsed.data.data.sections);
