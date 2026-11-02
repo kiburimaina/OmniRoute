@@ -16,11 +16,14 @@
 - [x] Separate authentication and business-data database connection strings.
 - [x] Membership verification before transaction-local tenant context is set.
 - [x] Tenant-scoped project and task list/create API routes.
+- [x] Tenant-scoped agent registry API; agents default to disabled.
+- [x] Human approval request/list/decision API; decisions are audited and never auto-execute external actions.
 - [x] Same-origin checks for cookie-authenticated mutations and bounded 64 KiB JSON parsing.
 - [x] Health endpoint and environment template.
 - [x] API/authentication contract documented.
 - [ ] Apply Better Auth schema migration in a configured database.
-- [ ] Protect dashboard and all workspace pages with server-side session checks.
+- [x] Protect dashboard with server-side session and workspace checks.
+- [ ] Add server-side session guards to future workspace pages as they are introduced.
 - [ ] Trusted email verification and password reset delivery.
 - [ ] Distributed rate limiting and production CSRF review.
 - [ ] Database migration runner and reviewed release process.
