@@ -22,7 +22,7 @@ export default async function WorkspacePage() {
  const data=await withOrganization(organization.id,["owner","admin","operator","viewer"],async(client)=>{
   const [p,t,a,g]=await Promise.all([
    client.query(`SELECT id,name,description FROM projects WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 100`,[organization.id]),
-   client.query(`SELECT t.id,t.title,t.status,t.project_id AS "projectId",t.assigned_agent_id AS "assignedAgentId",a.name AS "agentName" FROM tasks t LEFT JOIN agents a ON a.organization_id=t.organization_id AND a.id=t.assigned_agent_id WHERE t.organization_id=$1 ORDER BY t.created_at DESC LIMIT 100`,[organization.id]),
+   client.query(`SELECT t.id,t.title,t.status,t.project_id AS "projectId",t.assigned_agent_id AS "assignedAgentId",t.workflow_id AS "workflowId",a.name AS "agentName" FROM tasks t LEFT JOIN agents a ON a.organization_id=t.organization_id AND a.id=t.assigned_agent_id WHERE t.organization_id=$1 ORDER BY t.created_at DESC LIMIT 100`,[organization.id]),
    client.query(`SELECT id,task_id AS "taskId",action,details,status FROM approvals WHERE organization_id=$1 ORDER BY requested_at DESC LIMIT 100`,[organization.id]),
    client.query(`SELECT id,name,department FROM agents WHERE organization_id=$1 AND enabled=true ORDER BY name ASC`,[organization.id]),
   ]);
