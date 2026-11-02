@@ -39,7 +39,8 @@
 - [x] Execution budget checks cover steps, runtime, and output-token allowance; external tools remain unavailable until platform review.
 - [x] Unit tests added for lease ownership, disabled agents, invalid policy, tool registry fail-closed behaviour, and budget enforcement.
 - [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, lease heartbeats, and expired-lease recovery.
-- [x] Authenticated internal worker claim, heartbeat, and result endpoints with constant-time bearer-secret validation, tenant allowlisting, and audit events; model/tool execution remains disabled.
+- [x] Authenticated internal worker claim, heartbeat, and result endpoints with constant-time bearer-secret validation and tenant allowlisting; model/tool execution remains disabled.
+- [x] Authenticated lease-recovery endpoint iterates only server-configured organization UUIDs, with a bounded lease timeout and isolated RLS transaction per tenant; external scheduling remains an operator responsibility.
 - [x] Department-specific Development, Sales, and Operations role templates with responsibilities and conservative default policies.
 - [x] Persist template ID, description, and responsibilities on agent records through migration 0003; registry reads retain this metadata after toggling agents.
 - [x] Agent registry UI can create template-based roles or custom roles; template-created agents remain disabled with no tools or model token allowance.
@@ -58,7 +59,7 @@
 - [x] Authenticated worker success reports validate the active task workflow contract before completing the task; invalid output returns HTTP 422 without completing the task.
 - [x] Unit tests cover valid workflow output, missing/extra sections, empty content, and general task output.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
-- [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
+- [ ] Verify the latest CI run after the server-only dependency and approval-policy fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
