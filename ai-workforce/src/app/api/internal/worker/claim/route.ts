@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       execution: {
         agentId: result.execution.agentId,
         department: result.execution.department,
+        workflow: result.execution.workflow,
+        workflowInput: result.execution.workflowInput,
         policy: result.execution.policy,
         providerExecutionEnabled: false,
         externalToolsEnabled: false,
