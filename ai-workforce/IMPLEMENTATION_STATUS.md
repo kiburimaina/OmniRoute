@@ -33,6 +33,10 @@
 - [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain an operator task.
 - [x] PostgreSQL tenant-isolation integration tests added and wired into CI with an ephemeral database and restricted runtime role.
 - [x] Durable queue migration with retry limits, backoff scheduling, worker lease fields, and queue indexes.
+- [x] Worker transaction helper applies transaction-local tenant RLS context for the full unit of work.
+- [x] Agent execution preparation verifies task lease ownership, assigned-agent state, and a strict bounded policy schema.
+- [x] Execution budget checks cover steps, runtime, and output-token allowance; external tools remain unavailable until platform review.
+- [x] Unit tests added for lease ownership, disabled agents, invalid policy, tool registry fail-closed behaviour, and budget enforcement.
 - [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, and expired-lease recovery; worker execution remains disabled.
 - [ ] Execute and verify the latest CI database job after lint, workspace, and queue changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
