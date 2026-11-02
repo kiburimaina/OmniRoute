@@ -15,7 +15,7 @@
 - [x] First-workspace onboarding screen.
 - [x] Separate authentication and business-data database connection strings.
 - [x] Membership verification before transaction-local tenant context is set.
-- [x] Tenant-scoped project and task list/create API routes.
+- [x] Tenant-scoped project and task list/create API routes, plus audited cancellation of eligible tasks.
 - [x] Authenticated project/task workspace with live lists and create forms; project association is enforced by composite tenant foreign keys.
 - [x] Tenant-scoped agent registry API; agents default to disabled and owner/admin enablement is audited without starting execution.
 - [x] Human approval request/list/decision API; requests require active tasks, decisions are audited, and never auto-execute external actions.
@@ -32,7 +32,9 @@
 - [ ] Apply migrations to a provisioned environment and complete a reviewed release process.
 - [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain an operator task.
 - [x] PostgreSQL tenant-isolation integration tests added and wired into CI with an ephemeral database and restricted runtime role.
-- [ ] Execute and verify the latest CI database job; latest known run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
+- [x] Durable queue migration with retry limits, backoff scheduling, worker lease fields, and queue indexes.
+- [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, and expired-lease recovery; worker execution remains disabled.
+- [ ] Execute and verify the latest CI database job after lint, workspace, and queue changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
