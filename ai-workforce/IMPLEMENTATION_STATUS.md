@@ -35,10 +35,11 @@
 - [x] Durable queue migration with retry limits, backoff scheduling, worker lease fields, and queue indexes.
 - [x] Worker transaction helper applies transaction-local tenant RLS context for the full unit of work.
 - [x] Agent execution preparation verifies task lease ownership, assigned-agent state, and a strict bounded policy schema.
+- [x] Task creation can assign an enabled agent from the same organization; task lists display the assigned agent.
 - [x] Execution budget checks cover steps, runtime, and output-token allowance; external tools remain unavailable until platform review.
 - [x] Unit tests added for lease ownership, disabled agents, invalid policy, tool registry fail-closed behaviour, and budget enforcement.
 - [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, and expired-lease recovery; worker execution remains disabled.
-- [ ] Execute and verify the latest CI database job after lint, workspace, and queue changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
+- [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
