@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PoolClient } from "pg";
-import { claimNextTask, completeTask, failTask, recoverExpiredLeases } from "../src/lib/task-queue";
+import { claimNextTask, completeTask, failTask, heartbeatTask, recoverExpiredLeases } from "../src/lib/task-queue";
 
 function clientWith(results: Array<{ rows?: unknown[]; rowCount?: number }>) {
   const query = vi.fn(async (..._args: unknown[]) => {
@@ -32,6 +32,13 @@ describe("tenant-scoped task queue", () => {
   it("only completes a task owned by the worker lease", async () => {
     const { client, query } = clientWith([{ rows: [] }, { rowCount: 1 }]);
     await expect(completeTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
+    expect(query.mock.calls[0][0]).toContain("set_config");
+    expect(query.mock.calls[1][0]).toContain("locked_by = $3");
+  });
+
+  it("renews only a lease owned by the worker", async () => {
+    const { client, query } = clientWith([{ rows: [] }, { rowCount: 1 }]);
+    await expect(heartbeatTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
     expect(query.mock.calls[0][0]).toContain("set_config");
     expect(query.mock.calls[1][0]).toContain("locked_by = $3");
   });
