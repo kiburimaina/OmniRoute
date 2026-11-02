@@ -6,7 +6,7 @@
 ## Phase 2 — Foundation (in progress)
 - [x] Next.js/React/TypeScript application scaffold and command-centre dashboard.
 - [x] Zod domain contracts for organizations, projects, tasks, and approvals.
-- [x] Initial PostgreSQL schema and tenant-scoped RLS policies.
+- [x] Initial PostgreSQL schema and tenant-scoped RLS policies, forced for table owners.
 - [x] PostgreSQL connection pool with bounded pool size and timeouts.
 - [x] Better Auth self-hosted email/password configuration with UUID IDs and 12-hour sessions.
 - [x] Better Auth route handler and browser client.
@@ -16,7 +16,7 @@
 - [x] Separate authentication and business-data database connection strings.
 - [x] Membership verification before transaction-local tenant context is set.
 - [x] Tenant-scoped project and task list/create API routes.
-- [x] Tenant-scoped agent registry API; agents default to disabled.
+- [x] Tenant-scoped agent registry API; agents default to disabled and owner/admin enablement is audited without starting execution.
 - [x] Human approval request/list/decision API; decisions are audited and never auto-execute external actions.
 - [x] Same-origin checks for cookie-authenticated mutations and bounded 64 KiB JSON parsing.
 - [x] Health endpoint and environment template.
