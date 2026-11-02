@@ -32,3 +32,11 @@ export function requireWorkerOrganizationAccess(organizationId: string): void {
     throw new HttpError(403, "Worker is not authorized for this organization");
   }
 }
+
+export function getWorkerMaxConcurrency(): number {
+  const raw = process.env.WORKER_MAX_CONCURRENCY ?? "1";
+  if (!/^[1-9][0-9]?$/.test(raw)) throw new HttpError(503, "Worker concurrency setting is invalid");
+  const value = Number(raw);
+  if (value > 10) throw new HttpError(503, "Worker concurrency cannot exceed 10");
+  return value;
+}
