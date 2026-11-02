@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { apiError, HttpError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
+import { getAgentTemplate } from "@/lib/agent-templates";
 
 export const runtime = "nodejs";
 
 const CreateAgent = z.object({
   organizationId: z.string().uuid(),
   name: z.string().trim().min(1).max(120),
-  department: z.enum(["development", "sales", "operations"]),
+  department: z.enum(["development", "sales", "operations"]).optional(),
+  templateId: z.string().min(1).max(80).optional(),
 });
 const UpdateAgent = z.object({
   organizationId: z.string().uuid(),
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
       const created = result.rows[0];
       await client.query(
         "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'agent.created', 'agent', $3, $4::jsonb)",
-        [input.organizationId, userId, created.id, JSON.stringify({ name: input.name, department: input.department })],
+        [input.organizationId, userId, created.id, JSON.stringify({ name: agentName, department, templateId: input.templateId ?? null })],
       );
       return created;
     });
