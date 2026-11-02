@@ -41,6 +41,7 @@
 - [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, lease heartbeats, and expired-lease recovery.
 - [x] Authenticated internal worker claim, heartbeat, and result endpoints with constant-time bearer-secret validation, tenant allowlisting, and audit events; model/tool execution remains disabled.
 - [x] Department-specific Development, Sales, and Operations role templates with responsibilities and conservative default policies.
+- [x] Persist template ID, description, and responsibilities on agent records through migration 0003; registry reads retain this metadata after toggling agents.
 - [x] Agent registry UI can create template-based roles or custom roles; template-created agents remain disabled with no tools or model token allowance.
 - [x] Unit tests cover department template coverage, template lookup, and safe policy defaults.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
