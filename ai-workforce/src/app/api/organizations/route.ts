@@ -44,6 +44,7 @@ export async function POST(request: Request) {
         "INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'owner')",
         [org.id, userId],
       );
+      await client.query("SELECT set_config('app.current_org_id', $1, true)", [org.id]);
       await client.query(
         "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'organization.created', 'organization', $3, $4::jsonb)",
         [org.id, userId, org.id, JSON.stringify({ name: org.name })],
