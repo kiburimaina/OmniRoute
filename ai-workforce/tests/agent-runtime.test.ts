@@ -9,7 +9,7 @@ function fakeClient(row: unknown) {
  const query = vi.fn(async (..._args: unknown[]) => ({ rows: [_args[0] && String(_args[0]).includes("SELECT t.id") ? row : {}], rowCount: 1 }));
  return { client: { query } as unknown as PoolClient, query };
 }
-const baseRow = { taskId: task, agentId: agent, taskStatus: "running", lockedBy: "worker-a", agentEnabled: true, department: "operations", policy: { maxSteps: 5, maxRuntimeSeconds: 30, maxOutputTokens: 0, allowedTools: ["crm.lookup"] } };
+const baseRow = { taskId: task, agentId: agent, taskStatus: "running", lockedBy: "worker-a", attemptStartedAt: new Date(), agentEnabled: true, department: "operations", policy: { maxSteps: 5, maxRuntimeSeconds: 30, maxOutputTokens: 0, allowedTools: ["crm.lookup"] } };
 
 describe("agent execution policy gate", () => {
  it("prepares a leased task with platform provider/tool execution disabled", async () => {
@@ -22,6 +22,10 @@ describe("agent execution policy gate", () => {
  it("blocks tasks not leased by the requesting worker", async () => {
   const { client } = fakeClient({ ...baseRow, lockedBy: "worker-b" });
   await expect(prepareTaskExecution(client, org, task, "worker-a")).rejects.toThrow("not leased");
+ });
+ it("blocks a result when the active execution attempt exceeded its runtime budget", async () => {
+  const expired = fakeClient({ ...baseRow, attemptStartedAt: new Date(Date.now() - 31_000) });
+  await expect(prepareTaskExecution(expired.client, org, task, "worker-a")).rejects.toThrow("runtime budget exhausted");
  });
  it("blocks disabled or unassigned agents", async () => {
   const disabled = fakeClient({ ...baseRow, agentEnabled: false });
