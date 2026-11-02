@@ -4,7 +4,7 @@
 
 The API accepts a signed JWT in the HttpOnly cookie named `aw_session`. Required claims are `sub` (user UUID), `iss` (AUTH_ISSUER), `aud` (AUTH_AUDIENCE), and `exp`. Only HS256 is accepted. Keep AUTH_SECRET private and use short session lifetimes.
 
-The app does not yet include login, registration, password reset, OAuth callbacks, or a token-issuing endpoint. Until a trusted session issuer is integrated, project and task endpoints fail closed with 401. Production cookies must be HttpOnly, Secure, SameSite=Lax or stricter. Add CSRF protection before enabling cookie-authenticated state changes.
+The app does not yet include login, registration, password reset, OAuth callbacks, or a token-issuing endpoint. Until a trusted session issuer is integrated, project and task endpoints fail closed with 401. Production cookies must be HttpOnly, Secure, SameSite=Lax or stricter. The current POST routes require an exact Origin match and reject cross-site Fetch Metadata when present. Set APP_ORIGIN to the exact public origin in production; the request URL origin is only a development fallback. JSON bodies are capped at 64 KiB. These controls are defense in depth, not a replacement for an identity provider and a full CSRF review.
 
 ## Endpoints
 
@@ -23,8 +23,8 @@ Apply db/migrations/0001_initial.sql to a dedicated PostgreSQL database. The app
 ## Production blockers
 
 - Integrate a real identity provider and trusted session issuer.
-- Add CSRF protection, login/logout, and session rotation.
-- Add rate limiting and request-size limits.
+- Integrate a real identity provider and implement login/logout, session rotation, and review CSRF protections for every mutation route.
+- Add distributed rate limiting and endpoint-specific request-size limits.
 - Add migration tooling and least-privilege database role provisioning.
 - Add integration tests proving cross-tenant access is denied.
 - Add audit-event writes for privileged actions.
