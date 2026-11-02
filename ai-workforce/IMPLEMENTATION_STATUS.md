@@ -44,6 +44,9 @@
 - [x] Persist template ID, description, and responsibilities on agent records through migration 0003; registry reads retain this metadata after toggling agents.
 - [x] Agent registry UI can create template-based roles or custom roles; template-created agents remain disabled with no tools or model token allowance.
 - [x] Unit tests cover department template coverage, template lookup, and safe policy defaults.
+- [x] Structured department workflow catalogue with required inputs, output contracts, and approval action categories.
+- [x] Task creation validates workflow-to-agent department compatibility and persists workflow context; worker claims return the workflow contract.
+- [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
