@@ -1,12 +1,25 @@
 export const runtime = "nodejs";
 
 export async function GET() {
+  const secret = process.env.BETTER_AUTH_SECRET;
+  const authReady = Boolean(
+    process.env.AUTH_DATABASE_URL &&
+    secret &&
+    new TextEncoder().encode(secret).byteLength >= 32 &&
+    process.env.BETTER_AUTH_URL &&
+    process.env.APP_ORIGIN,
+  );
+  const databaseReady = Boolean(process.env.DATABASE_URL);
+
   return Response.json({
     status: "ok",
     service: "ai-workforce",
     mode: "foundation",
-    databaseConfigured: Boolean(process.env.DATABASE_URL),
-    authenticationConfigured: Boolean(process.env.BETTER_AUTH_SECRET && new TextEncoder().encode(process.env.BETTER_AUTH_SECRET).byteLength >= 32 && Boolean(process.env.AUTH_DATABASE_URL)),
-    modelProvidersEnabled: false,
+    readiness: {
+      businessDatabaseConfigured: databaseReady,
+      authenticationConfigured: authReady,
+      modelProvidersEnabled: false,
+      outboundActionsEnabled: false,
+    },
   });
 }
