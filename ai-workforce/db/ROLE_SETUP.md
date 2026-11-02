@@ -20,6 +20,7 @@ GRANT SELECT, INSERT ON TABLE organization_members TO aw_app;
 -- Current API surface: projects, tasks, agent registry, approvals, and audit events.
 GRANT SELECT, INSERT ON TABLE projects TO aw_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE tasks TO aw_app;
+GRANT SELECT, INSERT, UPDATE ON TABLE task_execution_attempts TO aw_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE agents TO aw_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE approvals TO aw_app;
 GRANT INSERT ON TABLE audit_events TO aw_app;
