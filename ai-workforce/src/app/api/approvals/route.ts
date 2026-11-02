@@ -38,15 +38,16 @@ export async function POST(request: Request) {
     if (!parsed.success) return Response.json({ error: "Invalid approval request", details: parsed.error.flatten() }, { status: 400 });
     const input = parsed.data;
     const approval = await withOrganization(input.organizationId, ["owner", "admin", "operator"], async (client, userId) => {
+      const task = await client.query(
+        "UPDATE tasks SET status = 'waiting_approval', updated_at = now() WHERE organization_id = $1 AND id = $2 AND status IN ('queued', 'running') RETURNING id",
+        [input.organizationId, input.taskId],
+      );
+      if (!task.rowCount) throw new HttpError(409, "Task is missing or is not eligible for an approval request");
       const result = await client.query(
         "INSERT INTO approvals (organization_id, task_id, action, details) VALUES ($1, $2, $3, $4::jsonb) RETURNING id, organization_id AS \"organizationId\", task_id AS \"taskId\", action, details, status, requested_at AS \"requestedAt\"",
         [input.organizationId, input.taskId, input.action, JSON.stringify(input.details)],
       );
       const created = result.rows[0];
-      await client.query(
-        "UPDATE tasks SET status = 'waiting_approval', updated_at = now() WHERE organization_id = $1 AND id = $2",
-        [input.organizationId, input.taskId],
-      );
       await client.query(
         "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'approval.requested', 'approval', $3, $4::jsonb)",
         [input.organizationId, userId, created.id, JSON.stringify({ action: input.action, taskId: input.taskId })],
