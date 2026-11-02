@@ -46,6 +46,9 @@
 - [x] Unit tests cover department template coverage, template lookup, and safe policy defaults.
 - [x] Structured department workflow catalogue with required inputs, output contracts, and approval action categories.
 - [x] Task creation validates workflow-to-agent department compatibility and persists workflow context; worker claims return the workflow contract.
+- [x] Backend approval requests accept only supported consequential action categories and validate them against the task workflow/agent policy.
+- [x] Approval requests lock tasks, prevent duplicate pending requests, and record the requester; self-approval is blocked for owner/admin decisions.
+- [x] Unit tests cover supported action categories, workflow policy matching, custom agent policy, and fail-closed unknown workflows.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
