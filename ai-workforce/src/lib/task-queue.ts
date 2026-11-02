@@ -24,10 +24,20 @@ export async function claimNextTask(
   client: PoolClient,
   organizationId: string,
   workerId: string,
+  maxConcurrentTasks = 1,
 ): Promise<LeasedTask | null> {
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
   if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
+  if (!Number.isInteger(maxConcurrentTasks) || maxConcurrentTasks < 1 || maxConcurrentTasks > 10) throw new Error("Invalid worker concurrency limit");
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
+  // Serialize concurrent poll requests for the same worker identity so two
+  // simultaneous requests cannot both pass the active-task count check.
+  await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [organizationId + ":" + workerId]);
+  const active = await client.query<{ count: string }>(
+    "SELECT count(*)::text AS count FROM tasks WHERE organization_id = $1 AND status = 'running' AND locked_by = $2",
+    [organizationId, workerId],
+  );
+  if (Number(active.rows[0]?.count ?? 0) >= maxConcurrentTasks) return null;
   const result = await client.query<LeasedTask>(
     `WITH candidate AS (
        SELECT id FROM tasks
