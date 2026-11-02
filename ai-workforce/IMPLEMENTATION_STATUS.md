@@ -38,7 +38,8 @@
 - [x] Task creation can assign an enabled agent from the same organization; task lists display the assigned agent.
 - [x] Execution budget checks cover steps, runtime, and output-token allowance; external tools remain unavailable until platform review.
 - [x] Unit tests added for lease ownership, disabled agents, invalid policy, tool registry fail-closed behaviour, and budget enforcement.
-- [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, and expired-lease recovery; worker execution remains disabled.
+- [x] Tenant-scoped queue primitives for SKIP LOCKED claims, lease-owned completion/failure, bounded exponential retries, lease heartbeats, and expired-lease recovery.
+- [x] Authenticated internal worker claim, heartbeat, and result endpoints with constant-time bearer-secret validation, tenant allowlisting, and audit events; model/tool execution remains disabled.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
