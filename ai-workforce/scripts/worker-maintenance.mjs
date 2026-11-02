@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -56,7 +58,8 @@ export async function recoverOnce(config, fetchImpl = fetch, signal) {
 export async function run(config, { fetchImpl = fetch, signal } = {}) {
   let stopping = false;
   let inFlight;
-  const stop = () => { stopping = true; };
+  const shutdown = new AbortController();
+  const stop = () => { stopping = true; shutdown.abort(); };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   log("info", "worker_maintenance_started", {
@@ -70,6 +73,7 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
       const controller = new AbortController();
       const abort = () => controller.abort();
       signal?.addEventListener("abort", abort, { once: true });
+      shutdown.signal.addEventListener("abort", abort, { once: true });
       inFlight = recoverOnce(config, fetchImpl, controller.signal);
       try {
         const result = await inFlight;
@@ -80,6 +84,7 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
         }
       } finally {
         signal?.removeEventListener("abort", abort);
+        shutdown.signal.removeEventListener("abort", abort);
         inFlight = undefined;
       }
       if (!stopping && !shutdown.signal.aborted) {\n        await delay(config.recoveryIntervalMs, undefined, { signal: shutdown.signal }).catch(() => {});\n      }
