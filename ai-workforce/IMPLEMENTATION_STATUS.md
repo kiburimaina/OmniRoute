@@ -54,6 +54,9 @@
 - [x] Expired lease recovery closes attempt history with `lease_expired` and applies bounded task retry policy.
 - [x] Workspace task cards expose structured result, attempt counters, latest failure, and completion time; tenant-scoped attempt history API added.
 - [x] CI and database role runbooks grant least-privilege access to the new execution-history table.
+- [x] Workflow-specific structured output validation enforces every declared output section, rejects unexpected sections, and bounds stored output to 48 KiB.
+- [x] Authenticated worker success reports validate the active task workflow contract before completing the task; invalid output returns HTTP 422 without completing the task.
+- [x] Unit tests cover valid workflow output, missing/extra sections, empty content, and general task output.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
 - [ ] Execute and verify the latest CI database job after lint, workspace, queue, and agent-assignment changes. Previous run passed typecheck and database tests but failed lint before the lint fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
