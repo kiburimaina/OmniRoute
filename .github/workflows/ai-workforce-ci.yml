@@ -1,0 +1,38 @@
+name: AI Workforce CI
+
+on:
+  pull_request:
+    paths:
+      - "ai-workforce/**"
+      - ".github/workflows/ai-workforce-ci.yml"
+  push:
+    branches:
+      - "ai-workforce/phase-1-architecture"
+    paths:
+      - "ai-workforce/**"
+      - ".github/workflows/ai-workforce-ci.yml"
+
+jobs:
+  verify:
+    name: Typecheck, lint and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-workforce
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ai-workforce/package-lock.json
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
