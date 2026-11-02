@@ -28,6 +28,8 @@ Run this from the ai-workforce directory in an environment where AUTH_DATABASE_U
 - POST /api/projects — JSON: { organizationId, name, description }. Requires owner, admin, or operator.
 - GET /api/tasks?organizationId=<uuid> — list up to 100 recent tasks for a verified member.
 - POST /api/tasks — JSON: { organizationId, projectId, title, description }. Requires owner, admin, or operator.
+- GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Creation and toggles require owner/admin; toggling does not launch execution.
+- GET/POST/PATCH /api/approvals — list/request/decide approvals. Requests require owner/admin/operator; decisions require owner/admin and never execute the approved action.
 - GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Create and toggle require owner/admin; toggling does not launch execution.
 - GET/POST/PATCH /api/approvals — list/request/decide approvals. Request requires owner/admin/operator; decisions require owner/admin and never execute the approved action.
 
