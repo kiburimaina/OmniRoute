@@ -102,3 +102,20 @@ export async function recoverExpiredLeases(
   );
   return result.rowCount ?? 0;
 }
+
+export async function heartbeatTask(
+  client: PoolClient,
+  organizationId: string,
+  taskId: string,
+  workerId: string,
+): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
+  if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
+  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
+  const result = await client.query(
+    `UPDATE tasks SET locked_at = now(), updated_at = now()
+     WHERE organization_id = $1 AND id = $2 AND status = 'running' AND locked_by = $3`,
+    [organizationId, taskId, workerId],
+  );
+  return result.rowCount === 1;
+}
