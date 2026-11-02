@@ -8,6 +8,9 @@ type Agent = {
   name: string;
   department: "development" | "sales" | "operations";
   enabled: boolean;
+  templateId?: string | null;
+  description?: string;
+  responsibilities?: string[];
 };
 
 export function AgentManager({ organizationId, initialAgents, canManage }: {
@@ -76,7 +79,7 @@ export function AgentManager({ organizationId, initialAgents, canManage }: {
               <article className="agent-row" key={agent.id}>
                 <div>
                   <strong>{agent.name}</strong>
-                  <p className="sub">{agent.department} department · {agent.enabled ? "Enabled in registry" : "Disabled"}</p>
+                  <p className="sub">{agent.department} department · {agent.enabled ? "Enabled in registry" : "Disabled"}{agent.templateId ? ` · ${agent.templateId}` : ""}</p>{agent.description && <p className="sub">{agent.description}</p>}{Boolean(agent.responsibilities?.length) && <ul>{agent.responsibilities?.map((item) => <li key={item}>{item}</li>)}</ul>}
                 </div>
                 {canManage && <button className="secondary-button" onClick={() => void toggleAgent(agent)}>{agent.enabled ? "Disable" : "Enable"}</button>}
               </article>
