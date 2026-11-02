@@ -19,12 +19,18 @@ export function isApprovalRequired(
   policy: unknown,
 ): boolean {
   if (!isApprovalAction(action)) return false;
-  const workflow = workflowId ? getWorkflow(workflowId) : undefined;
-  if (workflow?.approvalActions.includes(action)) return true;
-  if (workflowId && !workflow) return false;
+
+  // A known workflow is authoritative: never fall through to a broad default
+  // policy, which could silently expand the workflow's approved action scope.
+  if (workflowId) {
+    const workflow = getWorkflow(workflowId);
+    return workflow ? workflow.approvalActions.includes(action) : false;
+  }
+
   if (policy && typeof policy === "object" && "requireApprovalFor" in policy) {
     const required = (policy as { requireApprovalFor?: unknown }).requireApprovalFor;
     return Array.isArray(required) && required.includes(action);
   }
+
   return ["external_message", "publish", "purchase", "deploy", "repository_merge"].includes(action);
 }
