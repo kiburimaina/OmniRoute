@@ -27,7 +27,7 @@ Run this from the ai-workforce directory in an environment where AUTH_DATABASE_U
 - GET /api/projects?organizationId=<uuid> — list projects for a verified organization member.
 - POST /api/projects — JSON: { organizationId, name, description }. Requires owner, admin, or operator.
 - GET /api/tasks?organizationId=<uuid> — list up to 100 recent tasks for a verified member.
-- POST /api/tasks — JSON: { organizationId, projectId, title, description }. Requires owner, admin, or operator.
+- POST /api/tasks — JSON: { organizationId, projectId, assignedAgentId, title, description }. Requires owner, admin, or operator; an assigned agent must be enabled and belong to the same organization.
 - GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Creation and toggles require owner/admin; toggling does not launch execution.
 - GET/POST/PATCH /api/approvals — list/request/decide approvals. Requests require owner/admin/operator; decisions require owner/admin and never execute the approved action.
 
@@ -57,3 +57,12 @@ POST business and onboarding routes require exact Origin validation, Fetch Metad
 ## Durable task queue primitives
 
 Migration `0002_durable_task_queue.sql` adds bounded retry metadata, availability timestamps, worker leases, and queue indexes. `src/lib/task-queue.ts` provides tenant-scoped `SKIP LOCKED` task claiming, lease-owned completion/failure, exponential retry delay, and expired-lease recovery. These are infrastructure primitives only: no worker loop, model call, or external tool execution is enabled. Call queue functions inside a transaction and only from a trusted worker identity with the appropriate organization context.
+
+## Internal worker API
+
+The internal worker endpoints require an Authorization: Bearer credential backed by WORKER_SHARED_SECRET (minimum 32 bytes) and a WORKER_ALLOWED_ORGANIZATIONS allowlist containing exact organization UUIDs. Configure a separate secret and allowlist per worker deployment; do not expose these values to browser clients.
+
+- POST /api/internal/worker/claim — claims one eligible queued task using SKIP LOCKED, verifies the assigned enabled agent and returns its bounded policy. Requires { organizationId, workerId }.
+- POST /api/internal/worker/tasks/:taskId/result — reports succeeded/failed for a task lease owned by the same worker. Failed tasks are retried with bounded backoff until max_attempts is reached.
+
+Both endpoints run in tenant-scoped transactions and write audit events. Worker identities are currently deployment-level shared-secret identities, not individually provisioned credentials. Rotate the secret on compromise. No model provider or external tool is invoked; the returned execution plan explicitly reports both capabilities disabled. A separate authenticated worker process, per-worker credentials, distributed rate limiting, and operational lease scheduling are still required before production.
