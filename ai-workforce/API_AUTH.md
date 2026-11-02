@@ -28,7 +28,7 @@ Run this from the ai-workforce directory in an environment where AUTH_DATABASE_U
 - POST /api/projects — JSON: { organizationId, name, description }. Requires owner, admin, or operator.
 - GET /api/tasks?organizationId=<uuid> — list up to 100 recent tasks for a verified member.
 - POST /api/tasks — JSON: { organizationId, projectId, assignedAgentId, title, description }. Requires owner, admin, or operator; an assigned agent must be enabled and belong to the same organization.
-- GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Creation and toggles require owner/admin; toggling does not launch execution.
+- GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Creation and toggles require owner/admin; POST accepts either { organizationId, name, department } for a custom role or { organizationId, templateId } for a department template. New agents remain disabled.
 - GET/POST/PATCH /api/approvals — list/request/decide approvals. Requests require owner/admin/operator; decisions require owner/admin and never execute the approved action.
 
 ## Tenant security
@@ -67,3 +67,7 @@ The internal worker endpoints require an Authorization: Bearer credential backed
 - POST /api/internal/worker/tasks/:taskId/result — reports succeeded/failed for a task lease owned by the same worker. Failed tasks are retried with bounded backoff until max_attempts is reached.
 
 Both endpoints run in tenant-scoped transactions and write audit events. Worker identities are currently deployment-level shared-secret identities, not individually provisioned credentials. Rotate the secret on compromise. No model provider or external tool is invoked; the returned execution plan explicitly reports both capabilities disabled. A separate authenticated worker process, per-worker credentials, distributed rate limiting, and operational lease scheduling are still required before production.
+
+## Department role templates
+
+The agent registry includes starter roles for Development (Solution Architect, Frontend Engineer, Backend Engineer, QA Engineer), Sales (AI Receptionist, Sales Consultant, Customer Support), and Operations (Operations Coordinator, Business Analyst). Templates define responsibilities and a conservative execution policy. All start disabled, have zero model-output token allowance, and have no enabled tools. Template creation only creates a registry record; it does not start execution.
