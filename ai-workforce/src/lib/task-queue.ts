@@ -47,6 +47,8 @@ export async function completeTask(
   taskId: string,
   workerId: string,
 ): Promise<boolean> {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
+  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const result = await client.query(
     `UPDATE tasks SET status = 'succeeded', locked_at = NULL, locked_by = NULL,
        last_error = NULL, updated_at = now()
@@ -63,6 +65,8 @@ export async function failTask(
   workerId: string,
   errorMessage: string,
 ): Promise<"queued" | "failed" | "not_owned"> {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
+  await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const safeMessage = errorMessage.slice(0, 2000);
   const result = await client.query<{ status: "queued" | "failed" }>(
     `UPDATE tasks
