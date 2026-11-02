@@ -42,7 +42,7 @@
 - [x] Authenticated internal worker claim, heartbeat, and result endpoints with constant-time bearer-secret validation and tenant allowlisting; model/tool execution remains disabled.
 - [x] Authenticated lease-recovery endpoint iterates only server-configured organization UUIDs, with a bounded lease timeout and isolated RLS transaction per tenant; external scheduling remains an operator responsibility.
 - [x] Worker claims enforce a server-configured concurrency cap (1–10, default 1), serializing simultaneous polls per worker identity with transaction-scoped advisory locks.
-- [x] Heartbeats and success-result acceptance enforce the agent's maximum runtime against the current execution attempt; runtime overruns cannot be extended with heartbeats.
+- [x] Heartbeats and success-result acceptance enforce the agent's maximum runtime against the current execution attempt; runtime overruns cannot be extended with heartbeats.\n- [x] Standalone Node.js maintenance worker performs allowlisted expired-lease recovery with HTTPS enforcement, bounded settings, structured logs, and graceful SIGINT/SIGTERM shutdown; it does not claim tasks or invoke models/tools.\n- [x] Node built-in tests cover maintenance worker configuration, authentication request shape, malformed responses, and API failures.
 - [x] Department-specific Development, Sales, and Operations role templates with responsibilities and conservative default policies.
 - [x] Persist template ID, description, and responsibilities on agent records through migration 0003; registry reads retain this metadata after toggling agents.
 - [x] Agent registry UI can create template-based roles or custom roles; template-created agents remain disabled with no tools or model token allowance.
