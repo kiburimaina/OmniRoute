@@ -50,7 +50,7 @@
 - [x] Structured department workflow catalogue with required inputs, output contracts, and approval action categories.
 - [x] Task creation validates workflow-to-agent department compatibility and persists workflow context; worker claims return the workflow contract.
 - [x] Backend approval requests accept only supported consequential action categories and validate them against the task workflow/agent policy.
-- [x] Approval requests lock tasks, prevent duplicate pending requests, and record the requester; self-approval is blocked for owner/admin decisions.
+- [x] Approval requests lock tasks, prevent duplicate pending requests, and record the requester; self-approval is blocked for owner/admin decisions.\n- [x] Consequential approval requests bind to a canonical SHA-256 action/payload hash and expire after 24 hours; decisions reject expired and self-requested approvals.\n- [x] Added atomic, single-use approval consumption helper for use in the same transaction as the consequential action.\n- [x] Added tenant-scoped spend reservations and finite organization hard caps; missing/disabled budgets fail closed, reservations are idempotent, and settlement/release is single-use.\n- [ ] Wire approval consumption and spend reservations into an approved provider/action executor before enabling any external action or model call.\n- [ ] Add database integration tests for approval replay/expiry and concurrent budget reservations.
 - [x] Unit tests cover supported action categories, workflow policy matching, custom agent policy, and fail-closed unknown workflows.
 - [x] Durable task execution attempt history, structured JSON results, lifecycle timestamps, and bounded error persistence.
 - [x] Authenticated worker result endpoint enforces organization allowlist and active lease ownership for success/failure reports.
@@ -61,7 +61,7 @@
 - [x] Authenticated worker success reports validate the active task workflow contract before completing the task; invalid output returns HTTP 422 without completing the task.
 - [x] Unit tests cover valid workflow output, missing/extra sections, empty content, and general task output.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
-- [ ] Verify the latest CI run after the server-only dependency and approval-policy fixes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
+- [ ] Verify the latest CI run after approval authorization and spending-guard changes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
