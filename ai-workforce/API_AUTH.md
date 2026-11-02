@@ -63,6 +63,7 @@ Migration `0002_durable_task_queue.sql` adds bounded retry metadata, availabilit
 The internal worker endpoints require an Authorization: Bearer credential backed by WORKER_SHARED_SECRET (minimum 32 bytes) and a WORKER_ALLOWED_ORGANIZATIONS allowlist containing exact organization UUIDs. Configure a separate secret and allowlist per worker deployment; do not expose these values to browser clients.
 
 - POST /api/internal/worker/claim — claims one eligible queued task using SKIP LOCKED, verifies the assigned enabled agent and returns its bounded policy. Requires { organizationId, workerId }.
+- POST /api/internal/worker/tasks/:taskId/heartbeat — renews a lease only when the task is still running and owned by the same worker.
 - POST /api/internal/worker/tasks/:taskId/result — reports succeeded/failed for a task lease owned by the same worker. Failed tasks are retried with bounded backoff until max_attempts is reached.
 
 Both endpoints run in tenant-scoped transactions and write audit events. Worker identities are currently deployment-level shared-secret identities, not individually provisioned credentials. Rotate the secret on compromise. No model provider or external tool is invoked; the returned execution plan explicitly reports both capabilities disabled. A separate authenticated worker process, per-worker credentials, distributed rate limiting, and operational lease scheduling are still required before production.
