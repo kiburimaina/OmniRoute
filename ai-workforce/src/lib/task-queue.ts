@@ -30,8 +30,6 @@ export async function claimNextTask(
   if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
   if (!Number.isInteger(maxConcurrentTasks) || maxConcurrentTasks < 1 || maxConcurrentTasks > 10) throw new Error("Invalid worker concurrency limit");
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
-  // Serialize concurrent poll requests for the same worker identity so two
-  // simultaneous requests cannot both pass the active-task count check.
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [organizationId + ":" + workerId]);
   const active = await client.query<{ count: string }>(
     "SELECT count(*)::text AS count FROM tasks WHERE organization_id = $1 AND status = 'running' AND locked_by = $2",
@@ -114,7 +112,6 @@ export async function failTask(
   return result.rows[0]?.status ?? "not_owned";
 }
 
-// Recover expired leases. Invoke from a scheduled worker maintenance loop.
 export async function recoverExpiredLeases(
   client: PoolClient,
   organizationId: string,
@@ -150,8 +147,6 @@ export async function heartbeatTask(
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
   if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
-  // Heartbeats cannot extend an execution beyond its policy runtime. The
-  // platform clamps the configured value to the same 5–300 second schema bounds.
   const result = await client.query(
     `UPDATE tasks AS task SET locked_at = now(), updated_at = now()
      FROM task_execution_attempts AS attempt
@@ -164,10 +159,7 @@ export async function heartbeatTask(
        AND attempt.task_id = task.id AND attempt.worker_id = $3
        AND attempt.status = 'running'
        AND attempt.started_at > now() - make_interval(secs =>
-         CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3}
-  return result.rowCount === 1;
-}
-
+         CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3}$'
            THEN LEAST(300, GREATEST(5, (agent.policy->>'maxRuntimeSeconds')::int))
            ELSE 60 END)`,
     [organizationId, taskId, workerId],
