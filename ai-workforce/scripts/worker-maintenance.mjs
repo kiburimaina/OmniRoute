@@ -82,7 +82,7 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
         signal?.removeEventListener("abort", abort);
         inFlight = undefined;
       }
-      if (!stopping && !shutdown.signal.aborted) {\n        await Promise.race([delay(config.recoveryIntervalMs), new Promise((resolveWait) => shutdown.signal.addEventListener("abort", resolveWait, { once: true }))]);\n      }
+      if (!stopping && !shutdown.signal.aborted) {\n        await delay(config.recoveryIntervalMs, undefined, { signal: shutdown.signal }).catch(() => {});\n      }
     }
   } finally {
     if (inFlight) await inFlight.catch(() => {});
