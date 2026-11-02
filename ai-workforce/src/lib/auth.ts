@@ -9,7 +9,9 @@ const SessionClaims = z.object({
 
 export async function getSessionUserId(): Promise<string | null> {
   const secretValue = process.env.AUTH_SECRET;
-  if (!secretValue) return null;
+  // HS256 requires a strong, private secret. Fail closed rather than accepting
+  // a weak development value in a deployed environment.
+  if (!secretValue || new TextEncoder().encode(secretValue).byteLength < 32) return null;
 
   const token = (await cookies()).get("aw_session")?.value;
   if (!token) return null;
