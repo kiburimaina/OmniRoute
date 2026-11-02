@@ -37,12 +37,16 @@ export async function prepareTaskExecution(
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
   const result = await client.query<{
     taskId: string; agentId: string | null; taskStatus: string; lockedBy: string | null; workflowId: string | null; workflowInput: Record<string, unknown>;
-    agentEnabled: boolean | null; department: "development" | "sales" | "operations" | null; policy: unknown;
+    agentEnabled: boolean | null; department: "development" | "sales" | "operations" | null; policy: unknown; attemptStartedAt: Date | string | null;
   }>(
     `SELECT t.id AS "taskId", t.assigned_agent_id AS "agentId", t.status AS "taskStatus",
-       t.locked_by AS "lockedBy", t.workflow_id AS "workflowId", t.workflow_input AS "workflowInput", a.enabled AS "agentEnabled", a.department, a.policy
+       t.locked_by AS "lockedBy", t.workflow_id AS "workflowId", t.workflow_input AS "workflowInput", a.enabled AS "agentEnabled", a.department, a.policy,
+       attempt.started_at AS "attemptStartedAt"
      FROM tasks t LEFT JOIN agents a
        ON a.organization_id = t.organization_id AND a.id = t.assigned_agent_id
+     LEFT JOIN task_execution_attempts attempt
+       ON attempt.organization_id = t.organization_id AND attempt.task_id = t.id
+      AND attempt.worker_id = t.locked_by AND attempt.status = 'running'
      WHERE t.organization_id = $1 AND t.id = $2`,
     [organizationId, taskId],
   );
@@ -57,6 +61,11 @@ export async function prepareTaskExecution(
   if (task.workflowId && (!workflow || workflow.department !== task.department)) throw new ExecutionDenied("Task workflow is missing or incompatible with its assigned agent");
   const parsed = AgentPolicySchema.safeParse(task.policy ?? {});
   if (!parsed.success) throw new ExecutionDenied("Agent policy is invalid; execution is blocked");
+  if (!task.attemptStartedAt) throw new ExecutionDenied("Task execution attempt is missing");
+  const attemptStartedAt = new Date(task.attemptStartedAt).getTime();
+  if (!Number.isFinite(attemptStartedAt) || Date.now() - attemptStartedAt > parsed.data.maxRuntimeSeconds * 1000) {
+    throw new ExecutionDenied("Agent runtime budget exhausted");
+  }
   return {
     taskId: task.taskId,
     agentId: task.agentId,
