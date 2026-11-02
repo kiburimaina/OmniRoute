@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SignJWT } from "jose";
-import { verifySessionToken } from "../src/lib/session-token";
+import { verifySessionToken } from "./session-token";
 
 const secret = "test-only-secret-with-at-least-32-bytes";
 const userId = "f2c6c7c4-4c7a-4a92-9d31-12d67e1c5f01";
