@@ -82,3 +82,16 @@ a:hover { text-decoration: underline; }
 .notice { margin-top: 28px; padding: 16px; border: 1px solid #65502e; border-radius: 10px; background: #211b12; color: #dfc79c; font-size: 12px; line-height: 1.6; }
 @media (max-width: 850px) { .sidebar { width: 190px; } .main { padding: 28px 20px; } .grid { grid-template-columns: repeat(2, 1fr); } .departments { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .shell { display: block; } .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid #202b3c; } .sidebar .nav-label, .sidebar .nav-item { display: inline-block; margin: 6px; } .topline { display: block; } .pill { display: inline-block; margin-top: 12px; } .auth-card { padding: 26px 20px; } }
+
+
+.agent-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr); gap: 16px; margin-top: 22px; align-items: start; }
+.agent-list { display: grid; gap: 0; }
+.agent-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid #263348; }
+.agent-row:last-child { border-bottom: 0; }
+.agent-row strong { font-size: 14px; }
+.agent-row .sub { margin: 5px 0 0; font-size: 12px; text-transform: capitalize; }
+.agent-form { display: grid; gap: 14px; margin-top: 18px; }
+.agent-form label { display: grid; gap: 8px; color: #cbd5e5; font-size: 13px; font-weight: 600; }
+.agent-form input, .agent-form select { width: 100%; min-height: 44px; border: 1px solid #34425a; border-radius: 9px; padding: 0 12px; background: #0b111d; color: #fff; font: inherit; }
+.secondary-button { border: 1px solid #425473; border-radius: 8px; padding: 8px 12px; background: #18243a; color: #e8efff; cursor: pointer; }
+@media (max-width: 850px) { .agent-layout { grid-template-columns: 1fr; } }
