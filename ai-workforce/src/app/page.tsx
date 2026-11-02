@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { withOrganization, withUserTransaction } from "@/lib/db";
@@ -47,9 +48,9 @@ export default async function HomePage() {
       <aside className="sidebar">
         <div className="brand">AI <span>WORKFORCE</span></div>
         <div className="nav-label">Workspace</div>
-        <a className="nav-item active" href="/">Overview</a>
+        <Link className="nav-item active" href="/">Overview</Link>
         <a className="nav-item" href="#departments">Departments</a>
-        <a className="nav-item" href="/agents">Agent registry</a>
+        <Link className="nav-item" href="/agents">Agent registry</Link>
         <a className="nav-item" href="#tasks">Tasks</a>
         <a className="nav-item" href="#approvals">Approvals</a>
         <div className="nav-label">Manage</div>
