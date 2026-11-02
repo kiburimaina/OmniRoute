@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { apiError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
+import { apiError, HttpError, readJson, requireSameOrigin, withOrganization } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -7,6 +7,10 @@ const CreateAgent = z.object({
   organizationId: z.string().uuid(),
   name: z.string().trim().min(1).max(120),
   department: z.enum(["development", "sales", "operations"]),
+});
+const UpdateAgent = z.object({
+  organizationId: z.string().uuid(),
+  enabled: z.boolean(),
 });
 
 export async function GET(request: Request) {
@@ -45,5 +49,34 @@ export async function POST(request: Request) {
       return created;
     });
     return Response.json({ agent }, { status: 201 });
+  } catch (error) { return apiError(error); }
+}
+
+// Enabling an agent only changes registry state. It does not start a worker or
+// authorize model/provider execution; those capabilities remain disabled.
+export async function PATCH(request: Request) {
+  try {
+    requireSameOrigin(request);
+    const id = new URL(request.url).searchParams.get("id");
+    if (!id || !z.string().uuid().safeParse(id).success) {
+      return Response.json({ error: "A valid agent id is required" }, { status: 400 });
+    }
+    const parsed = UpdateAgent.safeParse(await readJson(request));
+    if (!parsed.success) return Response.json({ error: "Invalid agent update" }, { status: 400 });
+    const input = parsed.data;
+    const agent = await withOrganization(input.organizationId, ["owner", "admin"], async (client, userId) => {
+      const result = await client.query(
+        "UPDATE agents SET enabled = $1 WHERE organization_id = $2 AND id = $3 RETURNING id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\"",
+        [input.enabled, input.organizationId, id],
+      );
+      if (!result.rowCount) throw new HttpError(404, "Agent not found");
+      const updated = result.rows[0];
+      await client.query(
+        "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', $3, 'agent', $4, $5::jsonb)",
+        [input.organizationId, userId, input.enabled ? "agent.enabled" : "agent.disabled", id, JSON.stringify({ enabled: input.enabled })],
+      );
+      return updated;
+    });
+    return Response.json({ agent });
   } catch (error) { return apiError(error); }
 }
