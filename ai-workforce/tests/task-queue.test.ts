@@ -15,12 +15,25 @@ const org = "9f54a8aa-4e1b-4d2b-ae5a-52f4c50c4e2a";
 describe("tenant-scoped task queue", () => {
   it("sets tenant context before claiming a single queued task", async () => {
     const task = { id: "task-1", organizationId: org, title: "Build", description: "", attemptCount: 1, maxAttempts: 3 };
-    const { client, query } = clientWith([{ rows: [] }, { rows: [task], rowCount: 1 }]);
+    const { client, query } = clientWith([{ rows: [] }, { rows: [] }, { rows: [{ count: "0" }] }, { rows: [task], rowCount: 1 }]);
     await expect(claimNextTask(client, org, "worker-1")).resolves.toEqual(task);
-    expect(query).toHaveBeenCalledTimes(3);
-    expect(query.mock.calls[2][0]).toContain('INSERT INTO task_execution_attempts');
+    expect(query).toHaveBeenCalledTimes(5);
+    expect(query.mock.calls[4][0]).toContain('INSERT INTO task_execution_attempts');
     expect(query.mock.calls[0][0]).toContain("set_config('app.current_org_id'");
-    expect(query.mock.calls[1][0]).toContain("FOR UPDATE SKIP LOCKED");
+    expect(query.mock.calls[1][0]).toContain("pg_advisory_xact_lock");
+    expect(query.mock.calls[3][0]).toContain("FOR UPDATE SKIP LOCKED");
+  });
+
+  it("does not claim beyond the worker concurrency limit", async () => {
+    const { client, query } = clientWith([{ rows: [] }, { rows: [] }, { rows: [{ count: "2" }] }]);
+    await expect(claimNextTask(client, org, "worker-1", 2)).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects invalid worker concurrency limits", async () => {
+    const { client, query } = clientWith([]);
+    await expect(claimNextTask(client, org, "worker-1", 11)).rejects.toThrow("Invalid worker concurrency");
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("rejects malformed tenant and worker identifiers", async () => {
