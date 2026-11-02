@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -8,6 +8,10 @@ import { authClient } from "@/lib/auth-client";
 export default function SignInPage() {
   const router = useRouter();
 
+  const [registered, setRegistered] = useState(false);
+  useEffect(() => {
+    setRegistered(new URLSearchParams(window.location.search).get("registered") === "1");
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -41,6 +45,7 @@ export default function SignInPage() {
         <div className="brand">AI <span>WORKFORCE</span></div>
         <p className="eyebrow">Welcome back</p>
         <h1>Sign in to your workspace</h1>
+        {registered && <p className="auth-description" role="status">Your account was created. Sign in to continue to workspace setup.</p>}
         <label>Email address<input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         {error && <p className="form-error" role="alert">{error}</p>}
