@@ -18,7 +18,7 @@ describe("tenant-scoped task queue", () => {
     const { client, query } = clientWith([{ rows: [] }, { rows: [] }, { rows: [{ count: "0" }] }, { rows: [task], rowCount: 1 }]);
     await expect(claimNextTask(client, org, "worker-1")).resolves.toEqual(task);
     expect(query).toHaveBeenCalledTimes(5);
-    expect(query.mock.calls[4][0]).toContain('INSERT INTO task_execution_attempts');
+    expect(query.mock.calls[4][0]).toContain("INSERT INTO task_execution_attempts");
     expect(query.mock.calls[0][0]).toContain("set_config('app.current_org_id'");
     expect(query.mock.calls[1][0]).toContain("pg_advisory_xact_lock");
     expect(query.mock.calls[3][0]).toContain("FOR UPDATE SKIP LOCKED");
@@ -50,13 +50,15 @@ describe("tenant-scoped task queue", () => {
     expect(query.mock.calls[1][0]).toContain("locked_by = $3");
   });
 
-  it("renews only a lease owned by the worker", async () => {
+  it("renews only a lease owned by the worker and within the agent runtime", async () => {
     const { client, query } = clientWith([{ rows: [] }, { rowCount: 1 }]);
     await expect(heartbeatTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
     expect(query.mock.calls[0][0]).toContain("set_config");
     expect(query.mock.calls[1][0]).toContain("locked_by = $3");
     expect(query.mock.calls[1][0]).toContain("attempt.started_at");
     expect(query.mock.calls[1][0]).toContain("maxRuntimeSeconds");
+    expect(query.mock.calls[1][0]).toContain("LEAST(300, GREATEST(5");
+    expect(query.mock.calls[1][0]).toContain("ELSE 60 END");
   });
 
   it("returns retry state from the bounded exponential retry update", async () => {
