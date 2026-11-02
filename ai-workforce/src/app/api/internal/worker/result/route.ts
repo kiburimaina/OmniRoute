@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiError, readJson, withWorkerTransaction } from "@/lib/db";
-import { completeTask, failTask } from "@/lib/task-queue";
+import { completeTask, failTask, type TaskOutput } from "@/lib/task-queue";
 import { prepareTaskExecution } from "@/lib/agent-runtime";
 import { InvalidWorkflowOutput, validateTaskOutput } from "@/lib/workflow-output";
 import { requireWorkerAuthentication, requireWorkerOrganizationAccess } from "@/lib/worker-auth";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const result = await withWorkerTransaction(input.organizationId, async (client) => {
       if (input.outcome === "succeeded") {
         const execution = await prepareTaskExecution(client, input.organizationId, input.taskId, input.workerId);
-        let validatedOutput;
+        let validatedOutput: TaskOutput;
         try { validatedOutput = validateTaskOutput(execution, input.output); }
         catch (error) {
           if (error instanceof InvalidWorkflowOutput) return { accepted: false as const, invalidOutput: true as const, message: error.message };
