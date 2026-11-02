@@ -42,6 +42,8 @@ describe("tenant-scoped task queue", () => {
     await expect(heartbeatTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
     expect(query.mock.calls[0][0]).toContain("set_config");
     expect(query.mock.calls[1][0]).toContain("locked_by = $3");
+    expect(query.mock.calls[1][0]).toContain("attempt.started_at");
+    expect(query.mock.calls[1][0]).toContain("maxRuntimeSeconds");
   });
 
   it("returns retry state from the bounded exponential retry update", async () => {
