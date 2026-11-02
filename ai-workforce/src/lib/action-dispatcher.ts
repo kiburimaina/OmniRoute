@@ -6,6 +6,7 @@ import {
   type AuthorizedAction,
 } from "./approved-action-boundary";
 import type { ApprovalAction } from "./approval-policy";
+import { persistAuthorizedDispatch } from "./durable-action-dispatch";
 
 export type ActionHandlerContext = Readonly<{
   organizationId: string;
