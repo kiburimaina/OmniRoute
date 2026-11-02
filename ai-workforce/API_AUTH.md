@@ -64,9 +64,10 @@ The internal worker endpoints require an Authorization: Bearer credential backed
 
 - POST /api/internal/worker/claim — claims one eligible queued task using SKIP LOCKED, verifies the assigned enabled agent and returns its bounded policy. Requires { organizationId, workerId }.
 - POST /api/internal/worker/tasks/:taskId/heartbeat — renews a lease only when the task is still running and owned by the same worker.
+- POST /api/internal/worker/recover — recovers expired leases for every organization in the server-side allowlist; accepts optional `{ leaseSeconds }` bounded to 30–3600 seconds. Tenant IDs are never accepted from the request.
 - POST /api/internal/worker/tasks/:taskId/result — reports succeeded/failed for a task lease owned by the same worker. Failed tasks are retried with bounded backoff until max_attempts is reached.
 
-Both endpoints run in tenant-scoped transactions and write audit events. Worker identities are currently deployment-level shared-secret identities, not individually provisioned credentials. Rotate the secret on compromise. No model provider or external tool is invoked; the returned execution plan explicitly reports both capabilities disabled. A separate authenticated worker process, per-worker credentials, distributed rate limiting, and operational lease scheduling are still required before production.
+Claim and heartbeat run in tenant-scoped transactions; claim writes an audit event. Recovery processes each allowlisted organization in its own tenant-scoped transaction. The recovery route does not accept arbitrary tenant IDs. Worker identities are currently deployment-level shared-secret identities, not individually provisioned credentials. Rotate the secret on compromise. No model provider or external tool is invoked; the returned execution plan explicitly reports both capabilities disabled. A separate authenticated worker process, per-worker credentials, distributed rate limiting, and an external scheduled invocation of the recovery endpoint are still required before production. The recovery endpoint is not self-scheduling.
 
 ## Department role templates
 
