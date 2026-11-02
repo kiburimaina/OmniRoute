@@ -79,3 +79,9 @@ Tasks may optionally include `workflowId` and `workflowInput`. The API validates
 ## Approval enforcement
 
 Approval requests accept only the supported consequential action categories: `external_message`, `publish`, `purchase`, `deploy`, and `repository_merge`. The API reads the task workflow and assigned agent policy inside the tenant transaction, rejects actions that are not required by that policy, locks the task row, and prevents duplicate pending requests for the same task/action. Migration `0005_approval_requester.sql` records the requester. Owner/admin decisions are rejected when the deciding user is also the requester. An approval decision only updates approval/task state and writes an audit event; it never executes the approved action. Actual action execution remains unimplemented and disabled.
+
+## Worker execution results and attempt history
+
+The authenticated internal worker result endpoint accepts either a structured success result (`summary` plus JSON `data`) or a bounded failure message. It verifies the worker bearer secret and organization allowlist, then updates the task only when the worker owns the active lease. Each claim creates a durable attempt row; success and failure close that attempt. Expired-lease recovery marks the attempt as `lease_expired` and requeues or permanently fails the task according to its bounded retry policy. Task list responses include result, latest error, attempt counters, and lifecycle timestamps. `GET /api/tasks/attempts?organizationId=...&taskId=...` returns tenant-scoped attempt history. Migration `0006_execution_history.sql` creates the attempt table and structured task result fields.
+
+This is execution lifecycle infrastructure, not an enabled AI agent. Model/provider execution and external tools remain disabled. A trusted worker may report a result only for a task lease it owns; the platform does not claim that an AI model actually produced that result.
