@@ -48,6 +48,9 @@ describe("tenant-scoped task queue", () => {
     await expect(completeTask(client, org, "task-1", "worker-1")).resolves.toBe(true);
     expect(query.mock.calls[0][0]).toContain("set_config");
     expect(query.mock.calls[1][0]).toContain("locked_by = $3");
+    expect(query.mock.calls[1][0]).toContain("attempt.status = 'running'");
+    expect(query.mock.calls[1][0]).toContain("attempt.started_at > now()");
+    expect(query.mock.calls[1][0]).toContain("agent.policy->>'maxRuntimeSeconds'");
   });
 
   it("renews only a lease owned by the worker and within the agent runtime", async () => {
