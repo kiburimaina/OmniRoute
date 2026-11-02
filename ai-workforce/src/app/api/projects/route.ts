@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid project details", details: parsed.error.flatten() }, { status: 400 });
     }
     const input = parsed.data;
-    const project = await withOrganization(input.organizationId, ["owner", "admin", "operator"], async (client) => {
+    const project = await withOrganization(input.organizationId, ["owner", "admin", "operator"], async (client, userId) => {
       const result = await client.query(
         "INSERT INTO projects (organization_id, name, description) VALUES ($1, $2, $3) RETURNING id, organization_id AS \"organizationId\", name, description, created_at AS \"createdAt\"",
         [input.organizationId, input.name, input.description],
