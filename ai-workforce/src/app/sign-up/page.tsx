@@ -17,10 +17,10 @@ export default function SignUpPage() {
     event.preventDefault();
     setError("");
     setBusy(true);
-    const result = await authClient.signUp.email({ name, email, password, callbackURL: "/onboarding" });
+    const result = await authClient.signUp.email({ name, email, password, callbackURL: "/sign-in" });
     setBusy(false);
     if (result.error) setError(result.error.message || "Unable to create account.");
-    else router.replace("/onboarding");
+    else router.replace("/sign-in?registered=1");
   }
 
   return (
