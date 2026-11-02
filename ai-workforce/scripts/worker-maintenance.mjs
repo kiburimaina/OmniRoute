@@ -82,7 +82,7 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
         signal?.removeEventListener("abort", abort);
         inFlight = undefined;
       }
-      if (!stopping && !signal?.aborted) await delay(config.recoveryIntervalMs);
+      if (!stopping && !shutdown.signal.aborted) {\n        await Promise.race([delay(config.recoveryIntervalMs), new Promise((resolveWait) => shutdown.signal.addEventListener("abort", resolveWait, { once: true }))]);\n      }
     }
   } finally {
     if (inFlight) await inFlight.catch(() => {});
@@ -92,7 +92,7 @@ export async function run(config, { fetchImpl = fetch, signal } = {}) {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     await run(loadConfig());
   } catch (error) {
