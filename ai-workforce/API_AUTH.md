@@ -60,7 +60,7 @@ Migration `0002_durable_task_queue.sql` adds bounded retry metadata, availabilit
 
 ## Internal worker API
 
-The internal worker endpoints require an Authorization: Bearer credential backed by WORKER_SHARED_SECRET (minimum 32 bytes) and a WORKER_ALLOWED_ORGANIZATIONS allowlist containing exact organization UUIDs. Configure a separate secret and allowlist per worker deployment; do not expose these values to browser clients.
+The internal worker endpoints require an Authorization: Bearer credential backed by WORKER_SHARED_SECRET (minimum 32 bytes) and a WORKER_ALLOWED_ORGANIZATIONS allowlist containing exact organization UUIDs. Configure a separate secret and allowlist per worker deployment; do not expose these values to browser clients. WORKER_MAX_CONCURRENCY is a server-side limit from 1–10 (default 1); concurrent polls for the same worker identity are serialized with a transaction-scoped advisory lock.
 
 - POST /api/internal/worker/claim — claims one eligible queued task using SKIP LOCKED, verifies the assigned enabled agent and returns its bounded policy. Requires { organizationId, workerId }.
 - POST /api/internal/worker/tasks/:taskId/heartbeat — renews a lease only when the task is still running and owned by the same worker.
