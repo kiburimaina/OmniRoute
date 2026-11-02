@@ -6,7 +6,7 @@ export async function GET() {
     service: "ai-workforce",
     mode: "foundation",
     databaseConfigured: Boolean(process.env.DATABASE_URL),
-    authenticationConfigured: Boolean(process.env.AUTH_SECRET),
+    authenticationConfigured: Boolean(process.env.AUTH_SECRET && new TextEncoder().encode(process.env.AUTH_SECRET).byteLength >= 32),
     modelProvidersEnabled: false,
   });
 }
