@@ -50,9 +50,7 @@ database credentials or roles are created by the application repository.
 ## Separate Better Auth database role
 
 Better Auth connects through `AUTH_DATABASE_URL`, not the business API's `DATABASE_URL`.
-Use a separate login role for the authentication tables. After running Better Auth's
-schema migration as the migration owner, grant the auth role only the privileges it
-needs on the four Better Auth tables:
+Use a separate login role for the authentication tables. The current configuration uses Better Auth's core PostgreSQL tables only (no plugins). After applying the schema generated from the exact installed Better Auth version as the migration owner, grant the auth role only the privileges it needs on the four core tables:
 
 ```sql
 CREATE ROLE aw_auth LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
