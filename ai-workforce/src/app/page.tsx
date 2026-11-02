@@ -1,3 +1,8 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { withUserTransaction } from "@/lib/db";
+
 const metrics = [
   ["Active agents", "0", "Agents are disabled until configured"],
   ["Open tasks", "0", "No tasks have been submitted"],
@@ -11,7 +16,25 @@ const departments = [
   { name: "Operations", detail: "CRM workflows, customer support, reporting, and approved automations.", state: "Not configured" },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) redirect("/sign-in");
+
+  const organizations = await withUserTransaction(async (client, userId) => {
+    const result = await client.query(
+      `SELECT o.id, o.name, m.role
+       FROM organizations o
+       JOIN organization_members m ON m.organization_id = o.id
+       WHERE m.user_id = $1
+       ORDER BY o.created_at ASC`,
+      [userId],
+    );
+    return result.rows as Array<{ id: string; name: string; role: string }>;
+  });
+
+  if (organizations.length === 0) redirect("/onboarding");
+  const organization = organizations[0];
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -24,12 +47,13 @@ export default function HomePage() {
         <div className="nav-label">Manage</div>
         <a className="nav-item" href="#projects">Projects</a>
         <a className="nav-item" href="#settings">Settings</a>
+        <form action="/api/auth/sign-out" method="post"><button className="nav-item signout" type="submit">Sign out</button></form>
       </aside>
       <main className="main">
         <div className="topline">
           <div>
-            <div className="eyebrow">Command centre</div>
-            <h1>Good to have you here.</h1>
+            <div className="eyebrow">Command centre · {organization.name}</div>
+            <h1>Good to have you here, {session.user.name}.</h1>
             <p className="sub">Your AI teams, projects, and business operations in one place.</p>
           </div>
           <span className="pill">Foundation preview · Phase 2</span>
@@ -56,7 +80,7 @@ export default function HomePage() {
           </div>
         </section>
         <div className="notice">
-          Safety mode is active. No agent can send customer messages, spend money, merge code, or deploy software from this preview. Authentication and persistent storage must be configured before this dashboard is exposed to users.
+          Safety mode is active. No agent can send customer messages, spend money, merge code, or deploy software from this preview. Authentication is enabled, but database migrations, email verification, and tenant-isolation tests remain before production.
         </div>
       </main>
     </div>
