@@ -47,8 +47,8 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation and authorization control
       await client.query("INSERT INTO tasks (id, organization_id, title, created_by, status) VALUES ($1, $2, 'Send approved message', $3, 'running')", [task, org, user]);
       const hash = approvalPayloadHash("external_message", details);
       const first = await client.query(
-        "INSERT INTO approvals (organization_id, task_id, action, details, requested_by, payload_hash) VALUES ($1, $2, 'external_message', $3::jsonb, $4, $5) RETURNING id",
-        [org, task, JSON.stringify(details), user, hash],
+        "INSERT INTO approvals (organization_id, task_id, action, details, requested_by, payload_hash, status, decided_at, decided_by) VALUES ($1, $2, 'external_message', $3::jsonb, $4, $5, 'approved', now(), $6) RETURNING id",
+        [org, task, JSON.stringify(details), user, hash, "c3000000-0000-4000-8000-000000000014"],
       );
       await expect(consumeApproval(client, org, task, "external_message", { ...details, body: "Changed message" }))
         .rejects.toThrow(/matching, unexpired, unused/);
@@ -105,8 +105,14 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation and authorization control
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
 
-    const final = await pool!.query("SELECT spent_micros, reserved_micros FROM organization_spend_budgets WHERE organization_id = $1", [org]);
-    expect(final.rows[0]).toEqual({ spent_micros: "50", reserved_micros: "0" });
+    const verify = await pool!.connect();
+    try {
+      await verify.query("BEGIN");
+      await verify.query("SELECT set_config('app.current_org_id', $1, true)", [org]);
+      const final = await verify.query("SELECT spent_micros::text, reserved_micros::text FROM organization_spend_budgets WHERE organization_id = $1", [org]);
+      expect(final.rows[0]).toEqual({ spent_micros: "50", reserved_micros: "0" });
+      await verify.query("ROLLBACK");
+    } finally { verify.release(); }
   });
 
   it("releases a reservation once and restores the available cap", async () => {
