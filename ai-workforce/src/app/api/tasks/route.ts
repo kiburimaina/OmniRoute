@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         if (!agent.rowCount) throw new HttpError(400, "Assigned agent must exist in this organization and be enabled");
       }
       const result = await client.query(
-        "INSERT INTO tasks (organization_id, project_id, title, description, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, organization_id AS \"organizationId\", project_id AS \"projectId\", title, description, status, created_at AS \"createdAt\"",
+        "INSERT INTO tasks (organization_id, project_id, assigned_agent_id, title, description, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, organization_id AS \"organizationId\", project_id AS \"projectId\", title, description, status, created_at AS \"createdAt\"",
         [input.organizationId, input.projectId ?? null, input.assignedAgentId ?? null, input.title, input.description, userId],
       );
       const created = result.rows[0];
