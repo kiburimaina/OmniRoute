@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 const CreateAgent = z.object({
   organizationId: z.string().uuid(),
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1).max(120).optional(),
   department: z.enum(["development", "sales", "operations"]).optional(),
   templateId: z.string().min(1).max(80).optional(),
 });
@@ -38,10 +38,24 @@ export async function POST(request: Request) {
     const parsed = CreateAgent.safeParse(await readJson(request));
     if (!parsed.success) return Response.json({ error: "Invalid agent details", details: parsed.error.flatten() }, { status: 400 });
     const input = parsed.data;
+    const template = input.templateId ? getAgentTemplate(input.templateId) : undefined;
+    if (input.templateId && !template) return Response.json({ error: "Unknown agent template" }, { status: 400 });
+    if (!template && (!input.name || !input.department)) {
+      return Response.json({ error: "Name and department are required for a custom agent" }, { status: 400 });
+    }
+    if (template && input.department && input.department !== template.department) {
+      return Response.json({ error: "Template department cannot be changed" }, { status: 400 });
+    }
+    const agentName = template?.name ?? input.name!;
+    const department = template?.department ?? input.department!;
+    const policy = template?.policy ?? {
+      maxSteps: 8, maxRuntimeSeconds: 60, maxOutputTokens: 0, allowedTools: [],
+      requireApprovalFor: ["external_message", "publish", "purchase", "deploy", "repository_merge"],
+    };
     const agent = await withOrganization(input.organizationId, ["owner", "admin"], async (client, userId) => {
       const result = await client.query(
-        "INSERT INTO agents (organization_id, name, department, enabled) VALUES ($1, $2, $3, false) RETURNING id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\"",
-        [input.organizationId, input.name, input.department],
+        "INSERT INTO agents (organization_id, name, department, enabled, policy) VALUES ($1, $2, $3, false, $4::jsonb) RETURNING id, organization_id AS \"organizationId\", name, department, enabled, created_at AS \"createdAt\"",
+        [input.organizationId, agentName, department, JSON.stringify(policy)],
       );
       const created = result.rows[0];
       await client.query(
