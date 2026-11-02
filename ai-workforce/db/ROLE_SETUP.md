@@ -41,3 +41,24 @@ GRANT INSERT ON TABLE audit_events TO aw_app;
 
 This is a manual DBA runbook, not an automatically executed migration. No
 database credentials or roles are created by the application repository.
+
+
+## Separate Better Auth database role
+
+Better Auth connects through `AUTH_DATABASE_URL`, not the business API's `DATABASE_URL`.
+Use a separate login role for the authentication tables. After running Better Auth's
+schema migration as the migration owner, grant the auth role only the privileges it
+needs on the four Better Auth tables:
+
+```sql
+CREATE ROLE aw_auth LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+\password aw_auth
+GRANT CONNECT ON DATABASE ai_workforce TO aw_auth;
+GRANT USAGE ON SCHEMA public TO aw_auth;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "user", "session", "account", "verification" TO aw_auth;
+```
+
+If the Better Auth migration creates additional tables or plugins are enabled,
+review the generated schema and grant only the required table privileges. Do not
+grant this role access to tenant business tables. Store its connection string in
+`AUTH_DATABASE_URL` using the hosting platform's secret manager.
