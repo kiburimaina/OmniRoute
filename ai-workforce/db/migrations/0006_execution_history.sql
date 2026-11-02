@@ -10,7 +10,7 @@ CREATE TABLE task_execution_attempts (
   task_id uuid NOT NULL,
   attempt_number integer NOT NULL CHECK (attempt_number BETWEEN 1 AND 10),
   worker_id varchar(120) NOT NULL,
-  status varchar(16) NOT NULL CHECK (status IN ('running','succeeded','failed','lease_expired')),
+  status varchar(16) NOT NULL CHECK (status IN ('running','succeeded','failed','lease_expired','cancelled')),
   started_at timestamptz NOT NULL DEFAULT now(),
   finished_at timestamptz,
   output jsonb,
