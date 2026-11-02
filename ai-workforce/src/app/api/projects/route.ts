@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     if (!organizationId || !z.string().uuid().safeParse(organizationId).success) {
       return Response.json({ error: "A valid organizationId is required" }, { status: 400 });
     }
-    const projects = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client, userId) => {
+    const projects = await withOrganization(organizationId, ["owner", "admin", "operator", "viewer"], async (client) => {
       const result = await client.query(
         "SELECT id, organization_id AS \"organizationId\", name, description, created_at AS \"createdAt\" FROM projects WHERE organization_id = $1 ORDER BY created_at DESC",
         [organizationId],
