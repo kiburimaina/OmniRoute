@@ -93,6 +93,14 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approvals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
 
+-- FORCE also applies policies to a table owner. Superusers and BYPASSRLS roles
+-- still bypass RLS, so the runtime role must remain non-privileged.
+ALTER TABLE projects FORCE ROW LEVEL SECURITY;
+ALTER TABLE agents FORCE ROW LEVEL SECURITY;
+ALTER TABLE tasks FORCE ROW LEVEL SECURITY;
+ALTER TABLE approvals FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
+
 CREATE POLICY projects_tenant_isolation ON projects
   USING (organization_id = nullif(current_setting('app.current_org_id', true), '')::uuid)
   WITH CHECK (organization_id = nullif(current_setting('app.current_org_id', true), '')::uuid);
