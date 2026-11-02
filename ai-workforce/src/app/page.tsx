@@ -51,6 +51,7 @@ export default async function HomePage() {
         <Link className="nav-item active" href="/">Overview</Link>
         <a className="nav-item" href="#departments">Departments</a>
         <Link className="nav-item" href="/agents">Agent registry</Link>
+        <Link className="nav-item" href="/workspace">Projects & tasks</Link>
         <a className="nav-item" href="#tasks">Tasks</a>
         <a className="nav-item" href="#approvals">Approvals</a>
         <div className="nav-label">Manage</div>
