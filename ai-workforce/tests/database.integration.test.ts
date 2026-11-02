@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { Pool } from "pg";
 import { approvalPayloadHash, consumeApproval, reserveSpend, settleSpend, releaseSpend } from "../src/lib/approval-authorization";
+import { claimDurableDispatch, finishDurableDispatch, markExpiredDispatchesUncertain } from "../src/lib/durable-action-dispatch";
 
 const connectionString = process.env.INTEGRATION_DATABASE_URL;
 const enabled = Boolean(connectionString);
@@ -128,6 +129,47 @@ describe.skipIf(!enabled)("PostgreSQL tenant isolation and authorization control
       await expect(releaseSpend(client, org, reservation.id)).rejects.toThrow(/missing or already finalised/);
       const budget = await client.query("SELECT spent_micros, reserved_micros FROM organization_spend_budgets WHERE organization_id = $1", [org]);
       expect(budget.rows[0]).toEqual({ spent_micros: "0", reserved_micros: "0" });
+      await client.query("ROLLBACK");
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  });
+
+  it("claims durable actions once, enforces lease ownership, and quarantines expired work", async () => {
+    const client = await pool!.connect();
+    const org = "f6000000-0000-4000-8000-000000000006";
+    const user = "f6000000-0000-4000-8000-000000000016";
+    const task = "f6000000-0000-4000-8000-000000000026";
+    const approval = "f6000000-0000-4000-8000-000000000036";
+    try {
+      await client.query("BEGIN");
+      await client.query("INSERT INTO organizations (id, name) VALUES ($1, 'Dispatch tenant')", [org]);
+      await client.query("SELECT set_config('app.current_org_id', $1, true)", [org]);
+      await client.query("INSERT INTO tasks (id, organization_id, title, created_by, status) VALUES ($1, $2, 'Dispatch test', $3, 'running')", [task, org, user]);
+      await client.query(
+        "INSERT INTO approvals (id, organization_id, task_id, action, requested_by, payload_hash, status, decided_at, decided_by) VALUES ($1, $2, $3, 'external_message', $4, $5, 'approved', now(), $6)",
+        [approval, org, task, user, "a".repeat(64), user],
+      );
+      await client.query(
+        "INSERT INTO action_dispatches (organization_id, task_id, approval_id, action, payload_hash, details, idempotency_key) VALUES ($1, $2, $3, 'external_message', $4, $5::jsonb, 'dispatch-claim-once')",
+        [org, task, approval, "a".repeat(64), JSON.stringify({ recipient: "customer-1", body: "Approved" })],
+      );
+      const claimed = await claimDurableDispatch(client, org, "worker-a");
+      expect(claimed?.organizationId).toBe(org);
+      expect(claimed?.idempotencyKey).toBe("dispatch-claim-once");
+      await expect(claimDurableDispatch(client, org, "worker-b")).resolves.toBeNull();
+      await expect(finishDurableDispatch(client, org, claimed!.id, "worker-b", { status: "succeeded" }))
+        .rejects.toThrow(/lease is missing or no longer owned/);
+      await finishDurableDispatch(client, org, claimed!.id, "worker-a", { status: "succeeded", resultReference: "provider-ref-1" });
+      const final = await client.query("SELECT status, locked_by, result_reference FROM action_dispatches WHERE id = $1", [claimed!.id]);
+      expect(final.rows[0]).toEqual({ status: "succeeded", locked_by: null, result_reference: "provider-ref-1" });
+      await client.query(
+        "INSERT INTO action_dispatches (organization_id, task_id, approval_id, action, payload_hash, details, idempotency_key, status, locked_by, locked_at, attempts) VALUES ($1, $2, $3, 'external_message', $4, '{}'::jsonb, 'dispatch-expired', 'running', 'worker-crashed', now() - interval '10 minutes', 1)",
+        [org, task, approval, "b".repeat(64)],
+      );
+      await expect(markExpiredDispatchesUncertain(client, org, 120)).resolves.toBe(1);
+      const uncertain = await client.query("SELECT status, locked_by, last_error_code FROM action_dispatches WHERE organization_id = $1 AND idempotency_key = 'dispatch-expired'", [org]);
+      expect(uncertain.rows[0]).toEqual({ status: "uncertain", locked_by: null, last_error_code: "worker_lease_expired" });
+      await expect(claimDurableDispatch(client, org, "worker-c")).resolves.toBeNull();
       await client.query("ROLLBACK");
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
