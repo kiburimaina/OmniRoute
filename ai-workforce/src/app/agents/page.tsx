@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { withOrganization, withUserTransaction } from "@/lib/db";
@@ -35,7 +36,7 @@ export default async function AgentsPage() {
       <aside className="sidebar">
         <div className="brand">AI <span>WORKFORCE</span></div>
         <div className="nav-label">Workspace</div>
-        <a className="nav-item" href="/">Overview</a>
+        <Link className="nav-item" href="/">Overview</Link>
         <a className="nav-item active" href="/agents">Agents</a>
         <div className="nav-label">Workspace</div>
         <span className="nav-item">{organization.name}</span>
@@ -47,7 +48,7 @@ export default async function AgentsPage() {
             <h1>Build your AI teams</h1>
             <p className="sub">Create the roles your departments need and manage their registry status.</p>
           </div>
-          <a className="pill" href="/">Back to command centre</a>
+          <Link className="pill" href="/">Back to command centre</Link>
         </div>
         <div className="notice">Safety boundary: this page manages agent records only. No model calls, background workers, customer messages, or external actions are triggered.</div>
         <AgentManager organizationId={organization.id} initialAgents={agents} canManage={organization.role === "owner" || organization.role === "admin"} />
