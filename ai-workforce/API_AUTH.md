@@ -28,6 +28,8 @@ Run this from the ai-workforce directory in an environment where AUTH_DATABASE_U
 - POST /api/projects — JSON: { organizationId, name, description }. Requires owner, admin, or operator.
 - GET /api/tasks?organizationId=<uuid> — list up to 100 recent tasks for a verified member.
 - POST /api/tasks — JSON: { organizationId, projectId, title, description }. Requires owner, admin, or operator.
+- GET/POST/PATCH /api/agents — list/create agents and enable/disable registry entries. Create and toggle require owner/admin; toggling does not launch execution.
+- GET/POST/PATCH /api/approvals — list/request/decide approvals. Request requires owner/admin/operator; decisions require owner/admin and never execute the approved action.
 
 ## Tenant security
 
@@ -47,7 +49,7 @@ POST business and onboarding routes require exact Origin validation, Fetch Metad
 - Verify email before enabling sensitive account capabilities; configure a real email delivery provider.
 - Add password reset and account recovery delivery/configuration.
 - Add distributed rate limiting for authentication and application APIs.
-- Add integration tests proving sign-up/sign-in and cross-tenant isolation against PostgreSQL.
+- Add browser/API integration tests proving sign-up/sign-in and full workspace onboarding against PostgreSQL; tenant-isolation database tests are wired into CI.
 - Add migration automation with explicit release approval.
 - Add audit-event coverage for privileged actions.
 - Add secure secret management, monitoring, backups, and restore tests.
