@@ -26,9 +26,11 @@
 - [ ] Add server-side session guards to future workspace pages as they are introduced.
 - [ ] Trusted email verification and password reset delivery.
 - [ ] Distributed rate limiting and production CSRF review.
-- [ ] Database migration runner and reviewed release process.
+- [x] Database migration runner and documented operator setup procedure.
+- [ ] Apply migrations to a provisioned environment and complete a reviewed release process.
 - [x] Least-privilege PostgreSQL app-role setup runbook documented; role creation and grants remain an operator task.
-- [ ] Automated integration tests, including sign-up/sign-in and cross-tenant isolation.
+- [x] PostgreSQL tenant-isolation integration tests added and wired into CI with an ephemeral database and restricted runtime role.
+- [ ] Execute and verify the new CI database job; sign-up/sign-in integration tests remain outstanding.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
 - [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
 
