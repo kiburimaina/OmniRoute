@@ -140,9 +140,26 @@ export async function heartbeatTask(
   if (!/^[0-9a-f-]{36}$/i.test(organizationId)) throw new Error("Invalid organization id");
   if (!WORKER_ID.test(workerId)) throw new Error("Invalid worker id");
   await client.query("SELECT set_config('app.current_org_id', $1, true)", [organizationId]);
+  // Heartbeats cannot extend an execution beyond its policy runtime. The
+  // platform clamps the configured value to the same 5–300 second schema bounds.
   const result = await client.query(
-    `UPDATE tasks SET locked_at = now(), updated_at = now()
-     WHERE organization_id = $1 AND id = $2 AND status = 'running' AND locked_by = $3`,
+    `UPDATE tasks AS task SET locked_at = now(), updated_at = now()
+     FROM task_execution_attempts AS attempt
+     JOIN agents AS agent
+       ON agent.organization_id = attempt.organization_id
+      AND agent.id = (SELECT assigned_agent_id FROM tasks WHERE organization_id = $1 AND id = $2)
+     WHERE task.organization_id = $1 AND task.id = $2
+       AND task.status = 'running' AND task.locked_by = $3
+       AND attempt.organization_id = task.organization_id
+       AND attempt.task_id = task.id AND attempt.worker_id = $3
+       AND attempt.status = 'running'
+       AND attempt.started_at > now() - make_interval(secs =>
+         CASE WHEN agent.policy->>'maxRuntimeSeconds' ~ '^[0-9]{1,3}
+  return result.rowCount === 1;
+}
+
+           THEN LEAST(300, GREATEST(5, (agent.policy->>'maxRuntimeSeconds')::int))
+           ELSE 60 END)`,
     [organizationId, taskId, workerId],
   );
   return result.rowCount === 1;
