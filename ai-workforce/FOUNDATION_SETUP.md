@@ -55,3 +55,15 @@ Never commit real secrets or paste them into issues, logs, or source files.
 - Keep the project on its isolated feature branch until a separate repository is created and the user explicitly approves any move, merge, or deployment.
 
 The foundation is code-complete only after the operator steps and automated integration checks are completed. A successful build alone is not a production-readiness signal.
+
+
+## Safe worker maintenance process
+
+The separate maintenance process periodically calls the authenticated lease-recovery endpoint. It is intentionally **not** a task executor: it does not claim queued tasks, call OmniRoute, invoke tools, send customer messages, or perform business actions.
+
+1. Configure `AI_WORKFORCE_API_URL`, `WORKER_SHARED_SECRET`, and the server-side `WORKER_ALLOWED_ORGANIZATIONS` allowlist.
+2. Optionally set `WORKER_LEASE_SECONDS` (30–3600; default 300) and `WORKER_RECOVERY_INTERVAL_MS` (15,000–3,600,000; default 60,000).
+3. Start it as a separate process from the app directory with `npm run worker:maintenance`.
+4. Stop it with SIGINT or SIGTERM. It aborts an in-flight request and exits cleanly.
+
+Use HTTPS for remote API hosts; plain HTTP is accepted only for localhost development. The worker secret must contain at least 32 bytes and must never be placed in browser-visible variables. Do not run this process until the API and database are provisioned and the environment is configured.
