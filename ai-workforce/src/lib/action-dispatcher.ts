@@ -7,6 +7,7 @@ import {
 } from "./approved-action-boundary";
 import type { ApprovalAction } from "./approval-policy";
 import { persistAuthorizedDispatch } from "./durable-action-dispatch";
+import { persistAuthorizedDispatch } from "./durable-action-dispatch";
 
 export type ActionHandlerContext = Readonly<{
   organizationId: string;
@@ -51,6 +52,8 @@ export function registeredActionTypes(): ApprovalAction[] {
   return [...HANDLERS.keys()];
 }
 
+export type ActionDispatchRequest = ApprovedActionRequest & { idempotencyKey: string };
+
 export type AuthorizedDispatch = Readonly<{
   authorization: AuthorizedAction;
   details: Readonly<Record<string, unknown>>;
@@ -62,11 +65,12 @@ export type AuthorizedDispatch = Readonly<{
  */
 export async function authorizeActionDispatch(
   client: PoolClient,
-  request: ApprovedActionRequest,
+  request: ActionDispatchRequest,
 ): Promise<AuthorizedDispatch> {
   const handler = HANDLERS.get(request.action as ApprovalAction);
   if (!handler) throw new ActionDispatchDenied("No reviewed handler is registered for this action");
   const authorization = await authorizeApprovedAction(client, request);
+  await persistAuthorizedDispatch(client, authorization, request.details, request.idempotencyKey);
   const token: AuthorizedDispatch = Object.freeze({
     authorization,
     details: Object.freeze(structuredClone(request.details)),
@@ -76,29 +80,10 @@ export async function authorizeActionDispatch(
 }
 
 /**
- * Invoke only after the transaction that consumed approval and reserved spend
- * has committed. Tokens are process-local, one-use, and cannot be fabricated
- * by serializing a request. This is not a durable job runner.
+ * Execution is intentionally disabled until a worker presents a claimed
+ * durable-dispatch lease. A process-local token is never sufficient authority
+ * to trigger an external or consequential side effect.
  */
-export async function runAuthorizedAction(token: AuthorizedDispatch): Promise<ActionHandlerResult> {
-  if (!token || !AUTHORIZED_TOKENS.has(token)) {
-    throw new ActionDispatchDenied("A live authorization token is required");
-  }
-  if (CONSUMED_TOKENS.has(token)) throw new ActionDispatchDenied("Authorization token has already been used");
-  CONSUMED_TOKENS.add(token);
-
-  const action = token.authorization.action;
-  if (!["external_message", "publish", "purchase", "deploy", "repository_merge"].includes(action)) {
-    throw new ActionDispatchDenied("Unsupported action category");
-  }
-  const handler = HANDLERS.get(action as ApprovalAction);
-  if (!handler) throw new ActionDispatchDenied("Reviewed handler is no longer registered");
-
-  return handler(token.details, Object.freeze({
-    organizationId: token.authorization.organizationId,
-    taskId: token.authorization.taskId,
-    approvalId: token.authorization.approvalId,
-    payloadHash: token.authorization.payloadHash,
-    action: action as ApprovalAction,
-  }));
+export async function runAuthorizedAction(_token: AuthorizedDispatch): Promise<ActionHandlerResult> {
+  throw new ActionDispatchDenied("Direct execution is disabled; claim the durable dispatch through the reviewed worker boundary");
 }
