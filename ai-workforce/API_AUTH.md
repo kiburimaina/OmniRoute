@@ -53,3 +53,7 @@ POST business and onboarding routes require exact Origin validation, Fetch Metad
 - Add migration automation with explicit release approval.
 - Add audit-event coverage for privileged actions.
 - Add secure secret management, monitoring, backups, and restore tests.
+
+## Durable task queue primitives
+
+Migration `0002_durable_task_queue.sql` adds bounded retry metadata, availability timestamps, worker leases, and queue indexes. `src/lib/task-queue.ts` provides tenant-scoped `SKIP LOCKED` task claiming, lease-owned completion/failure, exponential retry delay, and expired-lease recovery. These are infrastructure primitives only: no worker loop, model call, or external tool execution is enabled. Call queue functions inside a transaction and only from a trusted worker identity with the appropriate organization context.
