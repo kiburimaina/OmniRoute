@@ -13,8 +13,9 @@ CREATE ROLE aw_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSR
 GRANT CONNECT ON DATABASE ai_workforce TO aw_app;
 GRANT USAGE ON SCHEMA public TO aw_app;
 
--- Membership is checked before the transaction-local tenant context is set.
-GRANT SELECT ON TABLE organization_members TO aw_app;
+-- Membership and workspace onboarding are currently handled by trusted API routes.
+GRANT SELECT, INSERT ON TABLE organizations TO aw_app;
+GRANT SELECT, INSERT ON TABLE organization_members TO aw_app;
 
 -- Current API surface only: project/task listing and creation plus audit inserts.
 GRANT SELECT, INSERT ON TABLE projects TO aw_app;
