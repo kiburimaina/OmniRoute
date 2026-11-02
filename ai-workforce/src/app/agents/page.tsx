@@ -24,11 +24,11 @@ export default async function AgentsPage() {
   const organization = organizations[0];
   const agents = await withOrganization(organization.id, ["owner", "admin", "operator", "viewer"], async (client) => {
     const result = await client.query(
-      `SELECT id, name, department, enabled FROM agents
+      `SELECT id, name, department, enabled, template_id AS "templateId", description, responsibilities FROM agents
        WHERE organization_id = $1 ORDER BY created_at DESC`,
       [organization.id],
     );
-    return result.rows as Array<{ id: string; name: string; department: "development" | "sales" | "operations"; enabled: boolean }>;
+    return result.rows as Array<{ id: string; name: string; department: "development" | "sales" | "operations"; enabled: boolean; templateId: string | null; description: string; responsibilities: string[] }>;
   });
 
   return (
