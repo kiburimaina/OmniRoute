@@ -88,6 +88,10 @@ export async function PATCH(request: Request) {
         [organizationId, userId, id],
       );
       await client.query(
+        "UPDATE task_execution_attempts SET status = 'cancelled', error_message = 'Task cancelled by an organisation operator', finished_at = now() WHERE organization_id = $1 AND task_id = $2 AND status = 'running'",
+        [organizationId, id],
+      );
+      await client.query(
         "INSERT INTO audit_events (organization_id, actor_user_id, actor_type, action, resource_type, resource_id, metadata) VALUES ($1, $2, 'user', 'task.cancelled', 'task', $3, '{}'::jsonb)",
         [organizationId, userId, id],
       );
