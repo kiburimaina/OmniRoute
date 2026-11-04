@@ -70,6 +70,18 @@ describe("OmniRoute model gateway policy", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("rejects provider responses larger than 1 MiB", async () => {
+    const config = getOmniRouteConfig({
+      OMNIROUTE_EXECUTION_ENABLED: "true",
+      OMNIROUTE_API_KEY: "test-key",
+      OMNIROUTE_ALLOWED_MODELS: "provider/free-model",
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("x".repeat(1_048_577), { status: 200 }));
+    await expect(completeWithOmniRoute({
+      model: "provider/free-model", system: "system", prompt: "prompt", maxOutputTokens: 100,
+    }, config, fetcher)).rejects.toThrow(/1 MiB response limit/);
+  });
+
   it("does not call the network for a model outside the allowlist", async () => {
     const fetcher = vi.fn<typeof fetch>();
     const config = getOmniRouteConfig({
