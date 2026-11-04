@@ -1,0 +1,81 @@
+name: AI Workforce CI
+
+concurrency:
+  group: ai-workforce-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - "ai-workforce/**"
+      - ".github/workflows/ai-workforce-ci.yml"
+  push:
+    branches:
+      - "ai-workforce/phase-1-architecture"
+    paths:
+      - "ai-workforce/**"
+      - ".github/workflows/ai-workforce-ci.yml"
+
+jobs:
+  verify:
+    name: Typecheck, lint, unit and database tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ai_workforce
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_workforce"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: ai-workforce
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_workforce
+      DATABASE_SSL: "false"
+      INTEGRATION_DATABASE_URL: postgresql://aw_app:aw_app_test_password@localhost:5432/ai_workforce
+      AUTH_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_workforce
+      AUTH_DATABASE_SSL: "false"
+      BETTER_AUTH_SECRET: "ci-only-secret-that-is-at-least-thirty-two-bytes-long"
+      BETTER_AUTH_URL: http://localhost:3000
+      APP_ORIGIN: http://localhost:3000
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install
+      - name: Apply business schema
+        run: npm run migrate
+      - name: Create restricted runtime role
+        run: |
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "CREATE ROLE aw_app LOGIN PASSWORD 'aw_app_test_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT CONNECT ON DATABASE ai_workforce TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT USAGE ON SCHEMA public TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT ON TABLE organizations TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT ON TABLE organization_members TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT ON TABLE projects TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE ON TABLE tasks, agents, approvals TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE ON TABLE task_execution_attempts TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE ON TABLE organization_spend_budgets, spend_reservations TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT SELECT, INSERT, UPDATE ON TABLE action_dispatches TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT INSERT ON TABLE audit_events TO aw_app"
+          PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/ai_workforce" -v ON_ERROR_STOP=1 -c "GRANT USAGE, SELECT ON SEQUENCE audit_events_id_seq TO aw_app"
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and database integration tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
