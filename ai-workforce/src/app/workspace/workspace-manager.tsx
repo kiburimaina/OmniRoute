@@ -1,0 +1,43 @@
+"use client";
+import { FormEvent, useMemo, useState } from "react";
+import { DEPARTMENT_WORKFLOWS } from "@/lib/department-workflows";
+
+type Project = { id: string; name: string; description: string };
+type Task = { id: string; title: string; status: string; projectId: string | null; assignedAgentId?: string | null; agentName?: string | null; workflowId?: string | null; result?: { summary: string; data: Record<string, unknown> } | null; lastError?: string | null; attemptCount?: number; maxAttempts?: number; startedAt?: string | null; completedAt?: string | null };
+type Agent = { id: string; name: string; department: string };
+type Approval = { id: string; taskId: string; action: string; details: Record<string, unknown>; status: string };
+
+export function WorkspaceManager({ organizationId, initialProjects, initialTasks, initialApprovals, availableAgents, canWrite, canApprove }: {
+ organizationId: string; initialProjects: Project[]; initialTasks: Task[]; initialApprovals: Approval[]; availableAgents: Agent[]; canWrite: boolean; canApprove: boolean;
+}) {
+ const [projects,setProjects]=useState(initialProjects), [tasks,setTasks]=useState(initialTasks), [approvals,setApprovals]=useState(initialApprovals);
+ const [projectName,setProjectName]=useState(""), [taskTitle,setTaskTitle]=useState(""), [taskProject,setTaskProject]=useState(""), [taskAgent,setTaskAgent]=useState(""), [taskWorkflow,setTaskWorkflow]=useState(""), [workflowContext,setWorkflowContext]=useState("");
+ const selectedAgent=availableAgents.find(a=>a.id===taskAgent);
+ const availableWorkflows=useMemo(()=>DEPARTMENT_WORKFLOWS.filter(w=>w.department===selectedAgent?.department),[selectedAgent?.department]);
+ const selectedWorkflow=availableWorkflows.find(w=>w.id===taskWorkflow);
+ const [busy,setBusy]=useState(false), [error,setError]=useState("");
+ async function request(path:string,method:string,body:Record<string,unknown>) {
+  const response=await fetch(path,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.error || "Request failed");
+  return data;
+ }
+ async function addProject(e:FormEvent<HTMLFormElement>) { e.preventDefault();setBusy(true);setError("");try{const d=await request("/api/projects","POST",{organizationId,name:projectName.trim()});setProjects(x=>[d.project,...x]);setProjectName("");}catch(x){setError(x instanceof Error?x.message:"Could not create project");}finally{setBusy(false);} }
+ async function addTask(e:FormEvent<HTMLFormElement>) { e.preventDefault();setBusy(true);setError("");try{const d=await request("/api/tasks","POST",{organizationId,title:taskTitle.trim(),description:workflowContext,projectId:taskProject||null,assignedAgentId:taskAgent||null,workflowId:taskWorkflow||null,workflowInput:{context:workflowContext}});setTasks(x=>[d.task,...x]);setTaskTitle("");setTaskAgent("");setTaskWorkflow("");setWorkflowContext("");}catch(x){setError(x instanceof Error?x.message:"Could not create task");}finally{setBusy(false);} }
+ async function cancelTask(task:Task) { setError("");try{const d=await request("/api/tasks?id="+encodeURIComponent(task.id),"PATCH",{organizationId});setTasks(x=>x.map(t=>t.id===task.id?{...t,status:d.task.status}:t));setApprovals(x=>x.map(a=>a.taskId===task.id&&a.status==="pending"?{...a,status:"rejected"}:a));}catch(x){setError(x instanceof Error?x.message:"Could not cancel task");} }
+ async function decide(a:Approval,decision:"approved"|"rejected") { setError("");try{const d=await request("/api/approvals?id="+encodeURIComponent(a.id),"PATCH",{organizationId,decision});setApprovals(x=>x.map(y=>y.id===a.id?{...y,status:d.approval.status}:y));setTasks(x=>x.map(t=>t.id===a.taskId?{...t,status:decision==="approved"?"queued":"cancelled"}:t));}catch(x){setError(x instanceof Error?x.message:"Could not save decision");} }
+ return <div className="workspace-grid">
+  <section className="card" id="projects"><h2 className="section-title">Projects</h2>
+   {projects.length?projects.map(p=><article className="workspace-item" key={p.id}><strong>{p.name}</strong><p className="sub">{p.description||"No description added"}</p></article>):<p className="sub">No projects yet.</p>}
+   {canWrite&&<form className="agent-form" onSubmit={addProject}><label>Project name<input required maxLength={160} value={projectName} onChange={e=>setProjectName(e.target.value)} placeholder="Website redesign"/></label><button className="auth-button" disabled={busy}>Create project</button></form>}
+  </section>
+  <section className="card" id="tasks"><h2 className="section-title">Tasks</h2>
+   {tasks.length?tasks.map(t=><article className="workspace-item" key={t.id}><div className="workspace-item-head"><strong>{t.title}</strong><span className="pill">{t.status}</span></div><p className="sub">{projects.find(p=>p.id===t.projectId)?.name||"Unassigned project"} · {t.agentName||availableAgents.find(a=>a.id===t.assignedAgentId)?.name||"Unassigned agent"}{t.workflowId?` · ${t.workflowId}`:""}</p>{t.attemptCount!==undefined&&<p className="metric-note">Attempts: {t.attemptCount}/{t.maxAttempts??3}{t.completedAt?` · Completed ${new Date(t.completedAt).toLocaleString()}`:""}</p>}{t.result&&<div className="notice"><strong>Execution result</strong><p>{t.result.summary}</p><pre>{JSON.stringify(t.result.data,null,2)}</pre></div>}{t.lastError&&<p className="form-error">Latest failure: {t.lastError}</p>}{canWrite&&["queued","running","waiting_approval"].includes(t.status)&&<div className="decision-actions"><button className="secondary-button danger-button" onClick={()=>void cancelTask(t)}>Cancel task</button></div>}</article>):<p className="sub">No tasks yet.</p>}
+   {canWrite&&<form className="agent-form" onSubmit={addTask}><label>Task title<input required maxLength={200} value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} placeholder="Prepare project requirements"/></label><label>Project<select value={taskProject} onChange={e=>setTaskProject(e.target.value)}><option value="">No project</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Assign agent<select value={taskAgent} onChange={e=>{setTaskAgent(e.target.value);setTaskWorkflow("");}}><option value="">No agent</option>{availableAgents.map(a=><option key={a.id} value={a.id}>{a.name} · {a.department}</option>)}</select></label>{selectedAgent&&<label>Department workflow<select value={taskWorkflow} onChange={e=>setTaskWorkflow(e.target.value)}><option value="">General task (no workflow)</option>{availableWorkflows.map(w=><option key={w.id} value={w.id}>{w.title}</option>)}</select></label>}{selectedWorkflow&&<div className="notice"><strong>{selectedWorkflow.description}</strong><p className="sub">Expected output: {selectedWorkflow.outputContract.join(" · ")}</p><p className="sub">Human approval applies to: {selectedWorkflow.approvalActions.join(", ")}</p><label>Workflow context<textarea maxLength={10000} value={workflowContext} onChange={e=>setWorkflowContext(e.target.value)} placeholder="Provide requirements, customer enquiry, reporting period or process details"/></label></div>}<button className="auth-button" disabled={busy}>Create task</button></form>}
+  </section>
+  <section className="card approval-panel" id="approvals"><h2 className="section-title">Approval queue</h2>
+   {approvals.length?approvals.map(a=><article className="workspace-item" key={a.id}><div className="workspace-item-head"><strong>{a.action}</strong><span className="pill">{a.status}</span></div><p className="sub">Task {a.taskId.slice(0,8)} · {JSON.stringify(a.details)}</p>{canApprove&&a.status==="pending"&&<div className="decision-actions"><button className="secondary-button" onClick={()=>void decide(a,"approved")}>Approve</button><button className="secondary-button danger-button" onClick={()=>void decide(a,"rejected")}>Reject</button></div>}</article>):<p className="sub">No approval requests.</p>}
+   <p className="metric-note">Decisions update workflow records only; they do not execute external actions.</p>
+  </section>{error&&<p className="form-error" role="alert">{error}</p>}
+ </div>;
+}
