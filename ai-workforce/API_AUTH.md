@@ -86,3 +86,10 @@ Approval requests accept only the supported consequential action categories: `ex
 The authenticated internal worker result endpoint accepts either a structured success result (`summary` plus JSON `data`) or a bounded failure message. It verifies the worker bearer secret and organization allowlist, then updates the task only when the worker owns the active lease. Each claim creates a durable attempt row; success and failure close that attempt. Expired-lease recovery marks the attempt as `lease_expired` and requeues or permanently fails the task according to its bounded retry policy. Task list responses include result, latest error, attempt counters, and lifecycle timestamps. `GET /api/tasks/attempts?organizationId=...&taskId=...` returns tenant-scoped attempt history. Migration `0006_execution_history.sql` creates the attempt table and structured task result fields.
 
 This is execution lifecycle infrastructure, not an enabled AI agent. Model/provider execution and external tools remain disabled. A trusted worker may report a result only for a task lease it owns; the platform does not claim that an AI model actually produced that result.
+
+
+## OmniRoute model gateway adapter
+
+`src/lib/model-gateway.ts` provides a small OpenAI-compatible adapter for the configured OmniRoute endpoint. It is not registered with the task executor and is not called by workers. Execution is disabled unless `OMNIROUTE_EXECUTION_ENABLED=true`, an API key is present, and an exact comma-separated `OMNIROUTE_ALLOWED_MODELS` allowlist is configured. Remote endpoints require HTTPS; plain HTTP is limited to localhost. Each request is bounded by `OMNIROUTE_MAX_OUTPUT_TOKENS` (1–4096, default 1024) and a 30-second timeout.
+
+The allowlist is an operator approval boundary, not proof that a model is free. Only add model IDs after checking the upstream provider's current pricing and terms. No model call, paid service, or production provider connection is enabled by the checked-in defaults. Connecting this adapter to an agent executor remains a separately reviewed milestone.
