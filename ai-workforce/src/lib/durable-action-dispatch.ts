@@ -215,10 +215,10 @@ export async function markDispatchUncertain(
 ): Promise<void> {
   const result = await client.query(
     `UPDATE action_dispatches
-        SET status = 'uncertain', last_error_code = $5,
+        SET status = 'uncertain', last_error_code = $4,
             completed_at = now(), updated_at = now(), locked_at = NULL, locked_by = NULL
       WHERE organization_id = $1 AND id = $2 AND locked_by = $3 AND status = 'running'`,
-    [organizationId, dispatchId, workerId, null, errorCode.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 80)],
+    [organizationId, dispatchId, workerId, errorCode.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 80)],
   );
   if (!result.rowCount) throw new DurableDispatchError("Dispatch lease is missing or no longer owned by this worker");
 }

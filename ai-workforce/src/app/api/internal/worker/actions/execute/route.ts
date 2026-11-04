@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     });
     if (!dispatch) return Response.json({ error: "No live dispatch lease owned by this worker" }, { status: 409 });
 
-    let result;
+    let result: Awaited<ReturnType<typeof invokeRegisteredActionHandler>>;
     try {
       result = await invokeRegisteredActionHandler(dispatch);
     } catch (error) {
