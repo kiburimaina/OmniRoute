@@ -84,6 +84,11 @@ export async function completeWithOmniRoute(
 ): Promise<OmniRouteCompletion> {
   assertOmniRouteModelAllowed(config, input.model, input.maxOutputTokens);
   if (!input.system.trim() || !input.prompt.trim()) throw new ModelGatewayDenied("System and user prompts are required");
+  // Bound request size before serialization/network I/O; provider token limits alone
+  // are not a reliable platform-side cost or memory boundary.
+  if (input.system.length > 20_000 || input.prompt.length > 20_000) {
+    throw new ModelGatewayDenied("System and user prompts must each be 20,000 characters or fewer");
+  }
   const response = await fetcher(`${config.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
