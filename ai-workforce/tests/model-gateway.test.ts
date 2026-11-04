@@ -57,6 +57,19 @@ describe("OmniRoute model gateway policy", () => {
     expect(result).toEqual({ text: "A bounded test result", model: "provider/free-model", inputTokens: 12, outputTokens: 8 });
   });
 
+  it("rejects oversized prompts before making a network request", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const config = getOmniRouteConfig({
+      OMNIROUTE_EXECUTION_ENABLED: "true",
+      OMNIROUTE_API_KEY: "test-key",
+      OMNIROUTE_ALLOWED_MODELS: "provider/free-model",
+    });
+    await expect(completeWithOmniRoute({
+      model: "provider/free-model", system: "s".repeat(20_001), prompt: "prompt", maxOutputTokens: 100,
+    }, config, fetcher)).rejects.toThrow(/20,000 characters or fewer/);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("does not call the network for a model outside the allowlist", async () => {
     const fetcher = vi.fn<typeof fetch>();
     const config = getOmniRouteConfig({
