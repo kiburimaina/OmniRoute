@@ -16,9 +16,49 @@ export class ModelGatewayDenied extends Error {
   }
 }
 
+const MAX_RESPONSE_BYTES = 1_048_576;
+
+async function readBoundedJson(response: Response): Promise<unknown> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+    throw new ModelGatewayDenied("OmniRoute response exceeded the 1 MiB response limit");
+  }
+  if (!response.body) throw new ModelGatewayDenied("OmniRoute returned an empty response body");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new ModelGatewayDenied("OmniRoute response exceeded the 1 MiB response limit");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch {
+    throw new ModelGatewayDenied("OmniRoute returned invalid JSON");
+  }
+}
+
 function parsePositiveInteger(value: string | undefined, fallback: number, maximum: number): number {
   if (value === undefined || value.trim() === "") return fallback;
-  if (!/^\d+$/.test(value)) throw new ModelGatewayDenied("OMNIROUTE_MAX_OUTPUT_TOKENS must be an integer");
+  if (!/^\\d+$/.test(value)) throw new ModelGatewayDenied("OMNIROUTE_MAX_OUTPUT_TOKENS must be an integer");
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
     throw new ModelGatewayDenied(`OMNIROUTE_MAX_OUTPUT_TOKENS must be between 1 and ${maximum}`);
@@ -36,7 +76,7 @@ function validateBaseUrl(value: string): string {
   if (url.protocol !== "https:" && !(url.protocol === "http:" && localHost)) {
     throw new ModelGatewayDenied("Remote OmniRoute endpoints must use HTTPS");
   }
-  return url.toString().replace(/\/$/, "");
+  return url.toString().replace(/\\/$/, "");
 }
 
 /** Configuration is opt-in; model execution remains disabled unless explicitly enabled. */
@@ -45,7 +85,7 @@ export function getOmniRouteConfig(env: OmniRouteEnvironment = process.env): Omn
   const baseUrl = validateBaseUrl(env.OMNIROUTE_BASE_URL || "http://127.0.0.1:20128/v1");
   const allowedModels = (env.OMNIROUTE_ALLOWED_MODELS || "")
     .split(",").map((model) => model.trim()).filter(Boolean);
-  if (allowedModels.some((model) => model.length > 160 || /\s/.test(model))) {
+  if (allowedModels.some((model) => model.length > 160 || /\\s/.test(model))) {
     throw new ModelGatewayDenied("OMNIROUTE_ALLOWED_MODELS contains an invalid model identifier");
   }
   if (new Set(allowedModels).size !== allowedModels.length) {
@@ -84,8 +124,6 @@ export async function completeWithOmniRoute(
 ): Promise<OmniRouteCompletion> {
   assertOmniRouteModelAllowed(config, input.model, input.maxOutputTokens);
   if (!input.system.trim() || !input.prompt.trim()) throw new ModelGatewayDenied("System and user prompts are required");
-  // Bound request size before serialization/network I/O; provider token limits alone
-  // are not a reliable platform-side cost or memory boundary.
   if (input.system.length > 20_000 || input.prompt.length > 20_000) {
     throw new ModelGatewayDenied("System and user prompts must each be 20,000 characters or fewer");
   }
@@ -104,7 +142,7 @@ export async function completeWithOmniRoute(
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new ModelGatewayDenied(`OmniRoute request failed with HTTP ${response.status}`);
-  const payload: unknown = await response.json();
+  const payload = await readBoundedJson(response);
   if (!payload || typeof payload !== "object") throw new ModelGatewayDenied("OmniRoute returned an invalid response");
   const data = payload as {
     model?: unknown;
@@ -117,6 +155,6 @@ export async function completeWithOmniRoute(
     text,
     model: typeof data.model === "string" ? data.model : input.model,
     inputTokens: Number.isSafeInteger(data.usage?.prompt_tokens) ? Number(data.usage?.prompt_tokens) : null,
-    outputTokens: Number.isSafeInteger(data.usage?.completion_tokens) ? Number(data.usage?.completion_tokens) : null,
+    outputTokens: Number.isSafeInteger(data.usage?.completion_tokens) ? Number(data.usage.completion_tokens) : null,
   });
 }
