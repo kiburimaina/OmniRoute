@@ -61,11 +61,18 @@
 - [x] Authenticated worker success reports validate the active task workflow contract before completing the task; invalid output returns HTTP 422 without completing the task.
 - [x] Unit tests cover valid workflow output, missing/extra sections, empty content, and general task output.
 - [x] Workspace task form supports selecting a workflow for the selected agent department; workflow contract unit tests added.
-- [ ] Verify the latest CI run after approval authorization and spending-guard changes. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
+- [x] Latest recorded CI run (2026-11-02, commit da22f93) passed typecheck, unit/database integration tests, lint, and production build; re-run CI after subsequent commits. Sign-up/sign-in and full browser onboarding integration tests remain outstanding.
 - [x] Sign-up/sign-in forms normalize email, handle network failures, and show account-creation confirmation.
 - [x] Audit-event writes for project, task, and organization creation (same transaction as the mutation).
-- [x] GitHub Actions typecheck/lint/build workflow configured; latest run must be checked before declaring green.
+- [x] GitHub Actions typecheck/lint/build workflow configured; latest recorded run is green (2026-11-02).
 
 ## Safety status
 
 Authentication and onboarding code is committed, but the database schema migration has not been run and no live database is configured. Do not expose the dashboard publicly yet. No paid services, provider credentials, customer messaging, merges, or deployments have been enabled.
+
+
+## Phase 3 — Model gateway preparation (in progress)
+- [x] Add an OpenAI-compatible OmniRoute adapter with explicit model allowlisting, output-token limits, HTTPS enforcement for remote endpoints, and request timeout.
+- [x] Keep provider execution disabled by default and do not register the adapter with the task executor.
+- [ ] Review current provider pricing/terms and approve an explicit free-model allowlist before any live request.
+- [ ] Add mocked gateway integration tests and connect one bounded, supervised workflow only after owner approval.
