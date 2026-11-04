@@ -173,3 +173,52 @@ export async function markExpiredDispatchesUncertain(
   );
   return result.rowCount ?? 0;
 }
+
+
+/** Load a dispatch only while its worker still owns a live lease. */
+export async function getClaimedDurableDispatch(
+  client: PoolClient,
+  organizationId: string,
+  dispatchId: string,
+  workerId: string,
+  leaseSeconds: number,
+): Promise<DurableActionDispatch | null> {
+  if (!Number.isInteger(leaseSeconds) || leaseSeconds < 10 || leaseSeconds > 3600) {
+    throw new DurableDispatchError("Invalid action lease duration");
+  }
+  const result = await client.query<{
+    id: string; organization_id: string; task_id: string; approval_id: string;
+    action: ApprovalAction; payload_hash: string; details: Record<string, unknown>; idempotency_key: string;
+  }>(
+    `SELECT id, organization_id, task_id, approval_id, action, payload_hash, details, idempotency_key
+       FROM action_dispatches
+      WHERE organization_id = $1 AND id = $2 AND locked_by = $3 AND status = 'running'
+        AND locked_at >= now() - ($4::text || ' seconds')::interval
+      FOR UPDATE`,
+    [organizationId, dispatchId, workerId, leaseSeconds],
+  );
+  const row = result.rows[0];
+  return row ? {
+    id: row.id, organizationId: row.organization_id, taskId: row.task_id,
+    approvalId: row.approval_id, action: row.action, payloadHash: row.payload_hash.trim(),
+    details: row.details, idempotencyKey: row.idempotency_key,
+  } : null;
+}
+
+/** Mark a potentially side-effecting execution uncertain; never auto-retry it. */
+export async function markDispatchUncertain(
+  client: PoolClient,
+  organizationId: string,
+  dispatchId: string,
+  workerId: string,
+  errorCode: string,
+): Promise<void> {
+  const result = await client.query(
+    `UPDATE action_dispatches
+        SET status = 'uncertain', last_error_code = $5,
+            completed_at = now(), updated_at = now(), locked_at = NULL, locked_by = NULL
+      WHERE organization_id = $1 AND id = $2 AND locked_by = $3 AND status = 'running'`,
+    [organizationId, dispatchId, workerId, null, errorCode.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 80)],
+  );
+  if (!result.rowCount) throw new DurableDispatchError("Dispatch lease is missing or no longer owned by this worker");
+}

@@ -24,3 +24,24 @@ export async function authorizeActionDispatch(client: PoolClient, request: Actio
 export async function runAuthorizedAction(_token: AuthorizedDispatch): Promise<ActionHandlerResult> {
   throw new ActionDispatchDenied("Direct execution is disabled; claim the durable dispatch through the reviewed worker boundary");
 }
+
+
+/** Invoke only a handler explicitly registered by reviewed application code. */
+export async function invokeRegisteredActionHandler(
+  dispatch: import("./durable-action-dispatch").DurableActionDispatch,
+): Promise<ActionHandlerResult> {
+  const handler = HANDLERS.get(dispatch.action);
+  if (!handler) throw new ActionDispatchDenied("No reviewed handler is registered for this action");
+  const result = await handler(Object.freeze(structuredClone(dispatch.details)), Object.freeze({
+    organizationId: dispatch.organizationId,
+    taskId: dispatch.taskId,
+    approvalId: dispatch.approvalId,
+    payloadHash: dispatch.payloadHash,
+    action: dispatch.action,
+  }));
+  if (!result || (result.status !== "completed" && result.status !== "accepted") ||
+      (result.reference !== undefined && (typeof result.reference !== "string" || result.reference.length > 240))) {
+    throw new ActionDispatchDenied("Action handler returned an invalid result");
+  }
+  return Object.freeze({ status: result.status, ...(result.reference ? { reference: result.reference } : {}) });
+}
